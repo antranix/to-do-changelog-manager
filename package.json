@@ -1,0 +1,111 @@
+{
+  "name": "to-do-changelog-manager",
+  "displayName": "TO-DO Changelog Manager",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.108.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:todoView",
+    "onCommand:todo.add",
+    "onCommand:todo.complete",
+    "onCommand:todo.refresh"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "todo.add",
+        "title": "To-DO: Add Task"
+      },
+      {
+        "command": "todo.complete",
+        "title": "To-DO: Mark Complete"
+      },
+      {
+        "command": "todo.uncomplete",
+        "title": "To-DO: Mark Uncomplete"
+      },
+      {
+        "command": "todo.refresh",
+        "title": "To-DO: Refresh"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "todo.add",
+          "when": "view == todoView",
+          "group": "navigation"
+        },
+        {
+          "command": "todo.refresh",
+          "when": "view == todoView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "todo.complete",
+          "when": "view == todoView && viewItem == pending",
+          "group": "inline"
+        },
+        {
+          "command": "todo.uncomplete",
+          "when": "view == todoView && viewItem == done",
+          "group": "inline"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "todoSideBar",
+          "title": "TO-DO",
+          "icon": "dist/resources/img/todo-list.svg"
+        }
+      ]
+    },
+    "views": {
+      "todoSideBar": [
+        {
+          "id": "todoView",
+          "name": "TO-DO"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/uuid": "^10.0.0",
+    "@types/vscode": "^1.108.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "copy-webpack-plugin": "^13.0.1",
+    "eslint": "^9.39.2",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.52.0",
+    "webpack": "^5.104.1",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "uuid": "^13.0.0"
+  }
+}
