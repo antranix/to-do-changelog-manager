@@ -28,8 +28,8 @@ type VersionNode = {
 
 type SectionNode = {
   kind: "section";
-  key: SectionKey;      // <- key real (sin emoji)
-  label: string;        // <- label bonito (con emoji)
+  key: SectionKey;      // <- key real
+  label: string;        // <- label bonito
   count: number;
   version: VersionNode;
 };
@@ -56,7 +56,6 @@ export class ChangelogProvider implements vscode.TreeDataProvider<Node> {
   async load() {
     const raw = await readChangelog();
 
-    // Normaliza a VersionNode
     this.versions = raw.map((v) => ({
       kind: "version",
       version: v.version,
@@ -95,14 +94,12 @@ export class ChangelogProvider implements vscode.TreeDataProvider<Node> {
   }
 
   getChildren(element?: Node): Thenable<Node[]> {
-    // Root: versiones
     if (!element) {
       return Promise.resolve(
         [...this.versions].sort((a, b) => b.date.localeCompare(a.date))
       );
     }
 
-    // Version -> secciones
     if (element.kind === "version") {
       return Promise.resolve(
         sections.map(({ key, label }) => {

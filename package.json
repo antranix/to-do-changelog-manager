@@ -3,10 +3,11 @@
   "publisher": "AntranixDEV",
   "displayName": "TO-DO Changelog Manager",
   "description": "Manage your TO-DO tasks and changelogs efficiently.",
-  "version": "0.0.2",
+  "version": "0.0.1",
   "engines": {
     "vscode": "^1.108.0"
   },
+  "icon": "resources/img/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -137,22 +138,22 @@
       "view/item/context": [
         {
           "command": "todo.complete",
-          "when": "view == todoView && viewItem == pendingTask",
+          "when": "view == todoView && viewItem == pending",
           "group": "inline"
         },
         {
           "command": "todo.uncomplete",
-          "when": "view == todoView && viewItem == doneTask",
+          "when": "view == todoView && viewItem == done",
           "group": "inline"
         },
         {
           "command": "todo.edit",
-          "when": "view == todoView && (viewItem == pendingTask || viewItem == doneTask)",
+          "when": "view == todoView && (viewItem == pending || viewItem == done)",
           "group": "inline"
         },
         {
           "command": "todo.remove",
-          "when": "view == todoView && (viewItem == pendingTask || viewItem == doneTask)",
+          "when": "view == todoView && (viewItem == pending || viewItem == done)",
           "group": "inline"
         },
         {

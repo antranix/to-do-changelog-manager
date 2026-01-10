@@ -5,18 +5,15 @@ import { readChangelog, writeChangelog } from "./persistence";
 export function registerChangelog(context: vscode.ExtensionContext) {
   const provider = new ChangelogProvider();
 
-  // Registrar el TreeDataProvider para la vista de changelog
   const treeReg = vscode.window.registerTreeDataProvider("changelogView", provider);
   context.subscriptions.push(treeReg);
 
-  // Refrescar la vista
   context.subscriptions.push(
     vscode.commands.registerCommand("changelog.refresh", () => {
       provider.refresh();
     })
   );
 
-  // Comando para agregar una nueva versión
   context.subscriptions.push(
     vscode.commands.registerCommand("changelog.addVersion", async () => {
       const version = await vscode.window.showInputBox({
@@ -27,7 +24,6 @@ export function registerChangelog(context: vscode.ExtensionContext) {
       const date = new Date().toISOString().split("T")[0];
       const all = await readChangelog();
 
-      // Evitar duplicados
       const exists = all.some((v) => v.version === version);
       if (exists) {
         vscode.window.showWarningMessage(`Version "${version}" already exists!`);
@@ -52,14 +48,10 @@ export function registerChangelog(context: vscode.ExtensionContext) {
     })
   );
 
-  // Comando para agregar una entrada en una sección
   context.subscriptions.push(
     vscode.commands.registerCommand("changelog.addEntry", async (node: any) => {
-      const versionObj = node.version; // objeto versión
+      const versionObj = node.version; 
 
-      // ✅ IMPORTANTE:
-      // - provider nuevo: node.key (sin emoji)
-      // - provider viejo: node.name (posiblemente con emoji)
       const sectionKey: string = node.key ?? node.name;
       const sectionLabel: string = node.label ?? node.name ?? sectionKey;
 
@@ -73,7 +65,6 @@ export function registerChangelog(context: vscode.ExtensionContext) {
       const versionIdx = all.findIndex((v) => v.version === versionObj.version);
       if (versionIdx === -1) return;
 
-      // ✅ Blindaje: si la sección no existe (o viene undefined), la creamos
       if (!all[versionIdx].sections[sectionKey]) {
         all[versionIdx].sections[sectionKey] = [];
       }
@@ -85,7 +76,6 @@ export function registerChangelog(context: vscode.ExtensionContext) {
     })
   );
 
-  // Comando para editar una entrada existente
   context.subscriptions.push(
     vscode.commands.registerCommand("changelog.editEntry", async (node: any) => {
       const newText = await vscode.window.showInputBox({
@@ -98,7 +88,6 @@ export function registerChangelog(context: vscode.ExtensionContext) {
       const versionIdx = all.findIndex((v) => v.version === node.version.version);
       if (versionIdx === -1) return;
 
-      // ✅ Blindaje: garantiza arreglo existente
       const secArr = all[versionIdx].sections[node.section] ?? [];
       all[versionIdx].sections[node.section] = secArr;
 
@@ -112,7 +101,6 @@ export function registerChangelog(context: vscode.ExtensionContext) {
     })
   );
 
-  // Comando para eliminar una entrada
   context.subscriptions.push(
     vscode.commands.registerCommand("changelog.removeEntry", async (node: any) => {
       const confirm = await vscode.window.showWarningMessage(
@@ -134,7 +122,6 @@ export function registerChangelog(context: vscode.ExtensionContext) {
     })
   );
 
-  // Comando para eliminar una versión completa
   context.subscriptions.push(
     vscode.commands.registerCommand("changelog.removeVersion", async (node: any) => {
       const confirm = await vscode.window.showWarningMessage(

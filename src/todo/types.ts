@@ -3,5 +3,5 @@ export type TodoItem = {
   text: string;
   completed: boolean;
   date_added: string;
-  date_finished?: string | null;
+  date_finished: string | null;
 };

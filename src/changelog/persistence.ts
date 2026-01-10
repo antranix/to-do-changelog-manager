@@ -150,29 +150,23 @@ function generateMd(versions: ChangelogVersion[]): string {
     "Security Changes",
   ] as const;
 
-  // ✅ Copia + orden: más reciente primero
   const sorted = [...versions].sort((a, b) => {
-    const byDate = b.date.localeCompare(a.date); // YYYY-MM-DD funciona perfecto
+    const byDate = b.date.localeCompare(a.date); // YYYY-MM-DD
     if (byDate !== 0) return byDate;
 
-    // Desempate por versión (simple, sin semver estricto)
     return String(b.version).localeCompare(String(a.version), undefined, {
       numeric: true,
     });
   });
 
   for (const v of sorted) {
-    // Filtrar secciones con contenido
+    
     const sectionsWithEntries = sectionOrder.filter(
       (sec) => (v.sections?.[sec]?.length ?? 0) > 0
     );
 
-    // ✅ Si una versión no tiene nada en ninguna sección, puedes:
-    // A) igual mostrar solo el header (sin secciones)
-    // B) o saltarla. Aquí dejo A.
     lines.push(`## ${v.version} ${v.date}`);
 
-    // ✅ Solo secciones con elementos
     for (const secName of sectionsWithEntries) {
       lines.push("");
       lines.push(`### ${secName}`);

@@ -15,44 +15,36 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
   async load() {
     const all = await readTodos();
 
-    // Separar pendientes y completadas
-    const pending = all.filter((i) => !i.completed);
-    const done    = all.filter((i) => i.completed);
+    const pending = all
+      .filter((i) => !i.completed)
+      .sort((a, b) => b.date_added.localeCompare(a.date_added));
 
-    // Orden: más recientes al principio según date_added / date_finished
-    pending.sort((a, b) => b.date_added.localeCompare(a.date_added));
-    done.sort((a, b) => {
-      // si ambas tienen date_finished
-      if (b.date_finished && a.date_finished) {
-        return b.date_finished.localeCompare(a.date_finished);
-      }
-      return 0;
-    });
+    const done = all
+      .filter((i) => i.completed)
+      .sort((a, b) =>
+        (b.date_finished ?? "").localeCompare(a.date_finished ?? "")
+      );
 
     this.items = [...pending, ...done];
     this._onDidChange.fire();
   }
 
-  refresh() {
+  refresh(): void {
     void this.load();
   }
 
   getTreeItem(item: TodoItem): vscode.TreeItem {
-    // Mostrar texto con fecha/hora y (finished) si aplica
     const added = formatDate(item.date_added);
-    const finishedPart = item.completed && item.date_finished
-      ? ` (finished: ${formatDate(item.date_finished)})`
-      : "";
+    const finished =
+      item.completed && item.date_finished
+        ? ` (finished: ${formatDate(item.date_finished)})`
+        : "";
 
-    const label = `${added} – ${item.text}${finishedPart}`;
+    const label = `${added} – ${item.text}${finished}`;
 
-    const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-
-    // contextual value para iconos/menus
+    const treeItem = new vscode.TreeItem(label);
     treeItem.contextValue = item.completed ? "done" : "pending";
     treeItem.tooltip = label;
-
-    // ícono de tarea pendiente vs completada
     treeItem.iconPath = new vscode.ThemeIcon(
       item.completed ? "check" : "circle-outline"
     );
@@ -60,47 +52,67 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
     return treeItem;
   }
 
-  getChildren(): Thenable<TodoItem[]> {
-    return Promise.resolve(this.items);
+  getChildren(element?: TodoItem): Thenable<TodoItem[]> {
+    return Promise.resolve(element ? [] : this.items);
   }
 
-  async add(text: string) {
+  async add(text: string): Promise<void> {
     const todos = await readTodos();
-    const todo = makeTodo(text);
-    todos.push(todo);
+    todos.push(makeTodo(text));
     await writeTodos(todos);
     this.refresh();
   }
 
-  async complete(item: TodoItem) {
+  async complete(item?: TodoItem): Promise<void> {
+    if (!item) return;
+
     const todos = await readTodos();
-    const idx = todos.findIndex((i) => i.id === item.id);
-    if (idx !== -1) {
-      todos[idx].completed = true;
-      todos[idx].date_finished = new Date().toISOString();
-      await writeTodos(todos);
-    }
+    const todo = todos.find((t) => t.id === item.id);
+    if (!todo) return;
+
+    todo.completed = true;
+    todo.date_finished = new Date().toISOString();
+    await writeTodos(todos);
     this.refresh();
   }
 
-  async uncomplete(item: TodoItem) {
+  async uncomplete(item?: TodoItem): Promise<void> {
+    if (!item) return;
+
     const todos = await readTodos();
-    const idx = todos.findIndex((i) => i.id === item.id);
-    if (idx !== -1) {
-      todos[idx].completed = false;
-      todos[idx].date_finished = null;
-      await writeTodos(todos);
-    }
+    const todo = todos.find((t) => t.id === item.id);
+    if (!todo) return;
+
+    todo.completed = false;
+    todo.date_finished = null;
+    await writeTodos(todos);
+    this.refresh();
+  }
+  async edit(item: TodoItem, newText: string) {
+    const todos = await readTodos();
+    const todo = todos.find((t) => t.id === item.id);
+    if (!todo) return;
+
+    todo.text = newText;
+    await writeTodos(todos);
+    this.refresh();
+  }
+
+  async remove(item: TodoItem) {
+    const todos = await readTodos();
+    const filtered = todos.filter((t) => t.id !== item.id);
+    await writeTodos(filtered);
     this.refresh();
   }
 }
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${y}-${m}-${day} ${hh}:${mm}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(
+    2,
+    "0"
+  )}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
