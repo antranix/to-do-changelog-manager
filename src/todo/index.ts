@@ -3,7 +3,6 @@ import { TodoProvider } from "./provider";
 
 export function registerTodo(context: vscode.ExtensionContext) {
   const provider = new TodoProvider();
-
   vscode.window.registerTreeDataProvider("todoView", provider);
 
   context.subscriptions.push(
@@ -11,19 +10,21 @@ export function registerTodo(context: vscode.ExtensionContext) {
       const text = await vscode.window.showInputBox({
         prompt: "Add a new task",
       });
-      if (text?.trim()) {
+      if (text) {
         await provider.add(text.trim());
       }
     }),
 
     vscode.commands.registerCommand("todo.complete", async (item) => {
-      if (item) await provider.complete(item);
+      await provider.complete(item);
     }),
 
     vscode.commands.registerCommand("todo.uncomplete", async (item) => {
-      if (item) await provider.uncomplete(item);
+      await provider.uncomplete(item);
     }),
 
-    vscode.commands.registerCommand("todo.refresh", () => provider.refresh())
+    vscode.commands.registerCommand("todo.refresh", () => {
+      provider.refresh();
+    })
   );
 }

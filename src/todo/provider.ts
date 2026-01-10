@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { TodoItem } from "./types";
+import type { TodoItem } from "./types";
 import { readTodos, writeTodos, makeTodo } from "./persistence";
 
 export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
@@ -13,7 +13,23 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
   }
 
   async load() {
-    this.items = await readTodos();
+    const all = await readTodos();
+
+    // Separar pendientes y completadas
+    const pending = all.filter((i) => !i.completed);
+    const done    = all.filter((i) => i.completed);
+
+    // Orden: más recientes al principio según date_added / date_finished
+    pending.sort((a, b) => b.date_added.localeCompare(a.date_added));
+    done.sort((a, b) => {
+      // si ambas tienen date_finished
+      if (b.date_finished && a.date_finished) {
+        return b.date_finished.localeCompare(a.date_finished);
+      }
+      return 0;
+    });
+
+    this.items = [...pending, ...done];
     this._onDidChange.fire();
   }
 
@@ -22,29 +38,24 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
   }
 
   getTreeItem(item: TodoItem): vscode.TreeItem {
-    const label = `${item.text} (added: ${formatDate(item.date_added)})`;
-    const treeItem = new vscode.TreeItem(
-      label,
-      vscode.TreeItemCollapsibleState.None
-    );
+    // Mostrar texto con fecha/hora y (finished) si aplica
+    const added = formatDate(item.date_added);
+    const finishedPart = item.completed && item.date_finished
+      ? ` (finished: ${formatDate(item.date_finished)})`
+      : "";
 
+    const label = `${added} – ${item.text}${finishedPart}`;
+
+    const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+
+    // contextual value para iconos/menus
     treeItem.contextValue = item.completed ? "done" : "pending";
+    treeItem.tooltip = label;
 
+    // ícono de tarea pendiente vs completada
     treeItem.iconPath = new vscode.ThemeIcon(
       item.completed ? "check" : "circle-outline"
     );
-
-    // Command to toggle
-    treeItem.command = {
-      title: item.completed ? "Mark Unfinished" : "Mark Complete",
-      command: item.completed ? "todo.uncomplete" : "todo.complete",
-      arguments: [item],
-    };
-    treeItem.tooltip = `Added: ${item.date_added}${
-      item.completed && item.date_finished
-        ? `\nFinished: ${item.date_finished}`
-        : ""
-    }`;
 
     return treeItem;
   }
@@ -54,38 +65,42 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
   }
 
   async add(text: string) {
+    const todos = await readTodos();
     const todo = makeTodo(text);
-    this.items.push(todo);
-    await writeTodos(this.items);
+    todos.push(todo);
+    await writeTodos(todos);
     this.refresh();
   }
 
   async complete(item: TodoItem) {
-    const idx = this.items.findIndex((i) => i.id === item.id);
-    if (idx >= 0) {
-      this.items[idx].completed = true;
-      this.items[idx].date_finished = new Date().toISOString();
-      await writeTodos(this.items);
-      this.refresh();
+    const todos = await readTodos();
+    const idx = todos.findIndex((i) => i.id === item.id);
+    if (idx !== -1) {
+      todos[idx].completed = true;
+      todos[idx].date_finished = new Date().toISOString();
+      await writeTodos(todos);
     }
+    this.refresh();
   }
 
   async uncomplete(item: TodoItem) {
-    const idx = this.items.findIndex((i) => i.id === item.id);
-    if (idx >= 0) {
-      this.items[idx].completed = false;
-      this.items[idx].date_finished = null;
-      await writeTodos(this.items);
-      this.refresh();
+    const todos = await readTodos();
+    const idx = todos.findIndex((i) => i.id === item.id);
+    if (idx !== -1) {
+      todos[idx].completed = false;
+      todos[idx].date_finished = null;
+      await writeTodos(todos);
     }
+    this.refresh();
   }
 }
 
-function formatDate(iso: string) {
+function formatDate(iso: string): string {
   const d = new Date(iso);
-  return `${d.getFullYear()}-${(d.getMonth()+1)
-    .toString()
-    .padStart(2, "0")}-${d.getDate()
-    .toString()
-    .padStart(2, "0")} ${d.getHours().toString().padStart(2,"0")}:${d.getMinutes().toString().padStart(2,"0")}`;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day} ${hh}:${mm}`;
 }

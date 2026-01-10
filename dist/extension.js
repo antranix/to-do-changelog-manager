@@ -42,7 +42,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.registerTodo = registerTodo;
 const vscode = __importStar(__webpack_require__(2));
-const provider_1 = __webpack_require__(3);
+const provider_1 = __webpack_require__(26);
 function registerTodo(context) {
     const provider = new provider_1.TodoProvider();
     vscode.window.registerTreeDataProvider("todoView", provider);
@@ -50,16 +50,16 @@ function registerTodo(context) {
         const text = await vscode.window.showInputBox({
             prompt: "Add a new task",
         });
-        if (text?.trim()) {
+        if (text) {
             await provider.add(text.trim());
         }
     }), vscode.commands.registerCommand("todo.complete", async (item) => {
-        if (item)
-            await provider.complete(item);
+        await provider.complete(item);
     }), vscode.commands.registerCommand("todo.uncomplete", async (item) => {
-        if (item)
-            await provider.uncomplete(item);
-    }), vscode.commands.registerCommand("todo.refresh", () => provider.refresh()));
+        await provider.uncomplete(item);
+    }), vscode.commands.registerCommand("todo.refresh", () => {
+        provider.refresh();
+    }));
 }
 
 
@@ -108,123 +108,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TodoProvider = void 0;
-const vscode = __importStar(__webpack_require__(2));
-const persistence_1 = __webpack_require__(4);
-class TodoProvider {
-    _onDidChange = new vscode.EventEmitter();
-    onDidChangeTreeData = this._onDidChange.event;
-    items = [];
-    constructor() {
-        void this.load();
-    }
-    async load() {
-        this.items = await (0, persistence_1.readTodos)();
-        this._onDidChange.fire();
-    }
-    refresh() {
-        void this.load();
-    }
-    getTreeItem(item) {
-        const label = `${item.text} (added: ${formatDate(item.date_added)})`;
-        const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-        treeItem.contextValue = item.completed ? "done" : "pending";
-        treeItem.iconPath = new vscode.ThemeIcon(item.completed ? "check" : "circle-outline");
-        // Command to toggle
-        treeItem.command = {
-            title: item.completed ? "Mark Unfinished" : "Mark Complete",
-            command: item.completed ? "todo.uncomplete" : "todo.complete",
-            arguments: [item],
-        };
-        treeItem.tooltip = `Added: ${item.date_added}${item.completed && item.date_finished
-            ? `\nFinished: ${item.date_finished}`
-            : ""}`;
-        return treeItem;
-    }
-    getChildren() {
-        return Promise.resolve(this.items);
-    }
-    async add(text) {
-        const todo = (0, persistence_1.makeTodo)(text);
-        this.items.push(todo);
-        await (0, persistence_1.writeTodos)(this.items);
-        this.refresh();
-    }
-    async complete(item) {
-        const idx = this.items.findIndex((i) => i.id === item.id);
-        if (idx >= 0) {
-            this.items[idx].completed = true;
-            this.items[idx].date_finished = new Date().toISOString();
-            await (0, persistence_1.writeTodos)(this.items);
-            this.refresh();
-        }
-    }
-    async uncomplete(item) {
-        const idx = this.items.findIndex((i) => i.id === item.id);
-        if (idx >= 0) {
-            this.items[idx].completed = false;
-            this.items[idx].date_finished = null;
-            await (0, persistence_1.writeTodos)(this.items);
-            this.refresh();
-        }
-    }
-}
-exports.TodoProvider = TodoProvider;
-function formatDate(iso) {
-    const d = new Date(iso);
-    return `${d.getFullYear()}-${(d.getMonth() + 1)
-        .toString()
-        .padStart(2, "0")}-${d.getDate()
-        .toString()
-        .padStart(2, "0")} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-}
-
-
-/***/ }),
-/* 4 */
-/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
-
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.readTodos = readTodos;
 exports.writeTodos = writeTodos;
 exports.makeTodo = makeTodo;
 const vscode = __importStar(__webpack_require__(2));
 const uuidv4 = (...args) => {
-    const { v4 } = __webpack_require__(5);
+    const { v4 } = __webpack_require__(4);
     return v4(...args);
 };
 const FILE_NAME = "todo.json";
@@ -246,7 +135,6 @@ async function readTodos() {
         return JSON.parse(text);
     }
     catch {
-        // If file doesn't exist or is invalid, start with empty
         return [];
     }
 }
@@ -254,23 +142,22 @@ async function writeTodos(items) {
     const uri = getFileUri();
     if (!uri)
         return;
-    const json = JSON.stringify(items, null, 2);
-    await vscode.workspace.fs.writeFile(uri, Buffer.from(json, "utf8"));
+    const data = JSON.stringify(items, null, 2);
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(data, "utf8"));
 }
-// Helper to create a new task
 function makeTodo(text) {
     return {
         id: uuidv4(),
         text,
         completed: false,
         date_added: new Date().toISOString(),
-        date_finished: null,
+        date_finished: null
     };
 }
 
 
 /***/ }),
-/* 5 */
+/* 4 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -290,20 +177,20 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   validate: () => (/* reexport safe */ _validate_js__WEBPACK_IMPORTED_MODULE_12__["default"]),
 /* harmony export */   version: () => (/* reexport safe */ _version_js__WEBPACK_IMPORTED_MODULE_13__["default"])
 /* harmony export */ });
-/* harmony import */ var _max_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6);
-/* harmony import */ var _nil_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(7);
-/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(8);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(11);
-/* harmony import */ var _v1_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(12);
-/* harmony import */ var _v1ToV6_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(15);
-/* harmony import */ var _v3_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(16);
-/* harmony import */ var _v4_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(19);
-/* harmony import */ var _v5_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(21);
-/* harmony import */ var _v6_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(23);
-/* harmony import */ var _v6ToV1_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(24);
-/* harmony import */ var _v7_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(25);
-/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(9);
-/* harmony import */ var _version_js__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(26);
+/* harmony import */ var _max_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(5);
+/* harmony import */ var _nil_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6);
+/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(7);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(10);
+/* harmony import */ var _v1_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(11);
+/* harmony import */ var _v1ToV6_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(14);
+/* harmony import */ var _v3_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(15);
+/* harmony import */ var _v4_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(18);
+/* harmony import */ var _v5_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(20);
+/* harmony import */ var _v6_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(22);
+/* harmony import */ var _v6ToV1_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(23);
+/* harmony import */ var _v7_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(24);
+/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(8);
+/* harmony import */ var _version_js__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(25);
 
 
 
@@ -321,7 +208,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 /***/ }),
-/* 6 */
+/* 5 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -332,7 +219,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 /***/ }),
-/* 7 */
+/* 6 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -343,14 +230,14 @@ __webpack_require__.r(__webpack_exports__);
 
 
 /***/ }),
-/* 8 */
+/* 7 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(9);
+/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
 
 function parse(uuid) {
     if (!(0,_validate_js__WEBPACK_IMPORTED_MODULE_0__["default"])(uuid)) {
@@ -363,14 +250,14 @@ function parse(uuid) {
 
 
 /***/ }),
-/* 9 */
+/* 8 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _regex_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(10);
+/* harmony import */ var _regex_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(9);
 
 function validate(uuid) {
     return typeof uuid === 'string' && _regex_js__WEBPACK_IMPORTED_MODULE_0__["default"].test(uuid);
@@ -379,7 +266,7 @@ function validate(uuid) {
 
 
 /***/ }),
-/* 10 */
+/* 9 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -390,7 +277,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 /***/ }),
-/* 11 */
+/* 10 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -398,7 +285,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__),
 /* harmony export */   unsafeStringify: () => (/* binding */ unsafeStringify)
 /* harmony export */ });
-/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(9);
+/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
 
 const byteToHex = [];
 for (let i = 0; i < 256; ++i) {
@@ -437,7 +324,7 @@ function stringify(arr, offset = 0) {
 
 
 /***/ }),
-/* 12 */
+/* 11 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -445,8 +332,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__),
 /* harmony export */   updateV1State: () => (/* binding */ updateV1State)
 /* harmony export */ });
-/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
+/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(12);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
 
 
 const _state = {};
@@ -533,14 +420,14 @@ function v1Bytes(rnds, msecs, nsecs, clockseq, node, buf, offset = 0) {
 
 
 /***/ }),
-/* 13 */
+/* 12 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (/* binding */ rng)
 /* harmony export */ });
-/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(14);
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
 
 const rnds8Pool = new Uint8Array(256);
 let poolPtr = rnds8Pool.length;
@@ -554,21 +441,21 @@ function rng() {
 
 
 /***/ }),
-/* 14 */
+/* 13 */
 /***/ ((module) => {
 
 module.exports = require("node:crypto");
 
 /***/ }),
-/* 15 */
+/* 14 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (/* binding */ v1ToV6)
 /* harmony export */ });
-/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
+/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
 
 
 function v1ToV6(uuid) {
@@ -582,7 +469,7 @@ function _v1ToV6(v1Bytes) {
 
 
 /***/ }),
-/* 16 */
+/* 15 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -591,8 +478,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   URL: () => (/* reexport safe */ _v35_js__WEBPACK_IMPORTED_MODULE_1__.URL),
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _md5_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(17);
-/* harmony import */ var _v35_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(18);
+/* harmony import */ var _md5_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(16);
+/* harmony import */ var _v35_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(17);
 
 
 
@@ -605,14 +492,14 @@ v3.URL = _v35_js__WEBPACK_IMPORTED_MODULE_1__.URL;
 
 
 /***/ }),
-/* 17 */
+/* 16 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(14);
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
 
 function md5(bytes) {
     if (Array.isArray(bytes)) {
@@ -627,7 +514,7 @@ function md5(bytes) {
 
 
 /***/ }),
-/* 18 */
+/* 17 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -637,8 +524,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "default": () => (/* binding */ v35),
 /* harmony export */   stringToBytes: () => (/* binding */ stringToBytes)
 /* harmony export */ });
-/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
+/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
 
 
 function stringToBytes(str) {
@@ -678,16 +565,16 @@ function v35(version, hash, value, namespace, buf, offset) {
 
 
 /***/ }),
-/* 19 */
+/* 18 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _native_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(20);
-/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(13);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(11);
+/* harmony import */ var _native_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(19);
+/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(12);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(10);
 
 
 
@@ -721,20 +608,20 @@ function v4(options, buf, offset) {
 
 
 /***/ }),
-/* 20 */
+/* 19 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(14);
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
 
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ({ randomUUID: node_crypto__WEBPACK_IMPORTED_MODULE_0__.randomUUID });
 
 
 /***/ }),
-/* 21 */
+/* 20 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -743,8 +630,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   URL: () => (/* reexport safe */ _v35_js__WEBPACK_IMPORTED_MODULE_1__.URL),
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _sha1_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(22);
-/* harmony import */ var _v35_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(18);
+/* harmony import */ var _sha1_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(21);
+/* harmony import */ var _v35_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(17);
 
 
 
@@ -757,14 +644,14 @@ v5.URL = _v35_js__WEBPACK_IMPORTED_MODULE_1__.URL;
 
 
 /***/ }),
-/* 22 */
+/* 21 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(14);
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
 
 function sha1(bytes) {
     if (Array.isArray(bytes)) {
@@ -779,16 +666,16 @@ function sha1(bytes) {
 
 
 /***/ }),
-/* 23 */
+/* 22 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(11);
-/* harmony import */ var _v1_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(12);
-/* harmony import */ var _v1ToV6_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(15);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(10);
+/* harmony import */ var _v1_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
+/* harmony import */ var _v1ToV6_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(14);
 
 
 
@@ -809,15 +696,15 @@ function v6(options, buf, offset) {
 
 
 /***/ }),
-/* 24 */
+/* 23 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (/* binding */ v6ToV1)
 /* harmony export */ });
-/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
+/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
 
 
 function v6ToV1(uuid) {
@@ -831,7 +718,7 @@ function _v6ToV1(v6Bytes) {
 
 
 /***/ }),
-/* 25 */
+/* 24 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -839,8 +726,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__),
 /* harmony export */   updateV7State: () => (/* binding */ updateV7State)
 /* harmony export */ });
-/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
+/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(12);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
 
 
 const _state = {};
@@ -909,14 +796,14 @@ function v7Bytes(rnds, msecs, seq, buf, offset = 0) {
 
 
 /***/ }),
-/* 26 */
+/* 25 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(9);
+/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
 
 function version(uuid) {
     if (!(0,_validate_js__WEBPACK_IMPORTED_MODULE_0__["default"])(uuid)) {
@@ -925,6 +812,133 @@ function version(uuid) {
     return parseInt(uuid.slice(14, 15), 16);
 }
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (version);
+
+
+/***/ }),
+/* 26 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.TodoProvider = void 0;
+const vscode = __importStar(__webpack_require__(2));
+const persistence_1 = __webpack_require__(3);
+class TodoProvider {
+    _onDidChange = new vscode.EventEmitter();
+    onDidChangeTreeData = this._onDidChange.event;
+    items = [];
+    constructor() {
+        void this.load();
+    }
+    async load() {
+        const all = await (0, persistence_1.readTodos)();
+        // Separar pendientes y completadas
+        const pending = all.filter((i) => !i.completed);
+        const done = all.filter((i) => i.completed);
+        // Orden: más recientes al principio según date_added / date_finished
+        pending.sort((a, b) => b.date_added.localeCompare(a.date_added));
+        done.sort((a, b) => {
+            // si ambas tienen date_finished
+            if (b.date_finished && a.date_finished) {
+                return b.date_finished.localeCompare(a.date_finished);
+            }
+            return 0;
+        });
+        this.items = [...pending, ...done];
+        this._onDidChange.fire();
+    }
+    refresh() {
+        void this.load();
+    }
+    getTreeItem(item) {
+        // Mostrar texto con fecha/hora y (finished) si aplica
+        const added = formatDate(item.date_added);
+        const finishedPart = item.completed && item.date_finished
+            ? ` (finished: ${formatDate(item.date_finished)})`
+            : "";
+        const label = `${added} – ${item.text}${finishedPart}`;
+        const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+        // contextual value para iconos/menus
+        treeItem.contextValue = item.completed ? "done" : "pending";
+        treeItem.tooltip = label;
+        // ícono de tarea pendiente vs completada
+        treeItem.iconPath = new vscode.ThemeIcon(item.completed ? "check" : "circle-outline");
+        return treeItem;
+    }
+    getChildren() {
+        return Promise.resolve(this.items);
+    }
+    async add(text) {
+        const todos = await (0, persistence_1.readTodos)();
+        const todo = (0, persistence_1.makeTodo)(text);
+        todos.push(todo);
+        await (0, persistence_1.writeTodos)(todos);
+        this.refresh();
+    }
+    async complete(item) {
+        const todos = await (0, persistence_1.readTodos)();
+        const idx = todos.findIndex((i) => i.id === item.id);
+        if (idx !== -1) {
+            todos[idx].completed = true;
+            todos[idx].date_finished = new Date().toISOString();
+            await (0, persistence_1.writeTodos)(todos);
+        }
+        this.refresh();
+    }
+    async uncomplete(item) {
+        const todos = await (0, persistence_1.readTodos)();
+        const idx = todos.findIndex((i) => i.id === item.id);
+        if (idx !== -1) {
+            todos[idx].completed = false;
+            todos[idx].date_finished = null;
+            await (0, persistence_1.writeTodos)(todos);
+        }
+        this.refresh();
+    }
+}
+exports.TodoProvider = TodoProvider;
+function formatDate(iso) {
+    const d = new Date(iso);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${y}-${m}-${day} ${hh}:${mm}`;
+}
 
 
 /***/ })

@@ -1,40 +1,61 @@
 {
   "name": "to-do-changelog-manager",
   "displayName": "TO-DO Changelog Manager",
-  "description": "",
+  "description": "Manage your TO-DO tasks and changelogs efficiently.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.108.0"
   },
-  "categories": [
-    "Other"
-  ],
+  "categories": ["Other"],
+
   "activationEvents": [
     "onView:todoView",
     "onCommand:todo.add",
     "onCommand:todo.complete",
+    "onCommand:todo.uncomplete",
     "onCommand:todo.refresh"
   ],
+
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "todo.add",
-        "title": "To-DO: Add Task"
+        "title": "Add Task"
       },
       {
         "command": "todo.complete",
-        "title": "To-DO: Mark Complete"
+        "title": "Mark Complete"
       },
       {
         "command": "todo.uncomplete",
-        "title": "To-DO: Mark Uncomplete"
+        "title": "Mark Uncomplete"
       },
       {
         "command": "todo.refresh",
-        "title": "To-DO: Refresh"
+        "title": "Refresh"
       }
     ],
+
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "todoContainer",
+          "title": "TO-DO",
+          "icon": "dist/resources/img/todo-list.svg"
+        }
+      ]
+    },
+
+    "views": {
+      "todoContainer": [
+        {
+          "id": "todoView",
+          "name": "TO-DO"
+        }
+      ]
+    },
+
     "menus": {
       "view/title": [
         {
@@ -58,23 +79,6 @@
           "command": "todo.uncomplete",
           "when": "view == todoView && viewItem == done",
           "group": "inline"
-        }
-      ]
-    },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "todoSideBar",
-          "title": "TO-DO",
-          "icon": "dist/resources/img/todo-list.svg"
-        }
-      ]
-    },
-    "views": {
-      "todoSideBar": [
-        {
-          "id": "todoView",
-          "name": "TO-DO"
         }
       ]
     }
