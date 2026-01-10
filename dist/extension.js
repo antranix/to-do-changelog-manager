@@ -42,7 +42,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.registerTodo = registerTodo;
 const vscode = __importStar(__webpack_require__(2));
-const provider_1 = __webpack_require__(26);
+const provider_1 = __webpack_require__(3);
 function registerTodo(context) {
     const provider = new provider_1.TodoProvider();
     vscode.window.registerTreeDataProvider("todoView", provider);
@@ -108,12 +108,139 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.TodoProvider = void 0;
+const vscode = __importStar(__webpack_require__(2));
+const persistence_1 = __webpack_require__(4);
+class TodoProvider {
+    _onDidChange = new vscode.EventEmitter();
+    onDidChangeTreeData = this._onDidChange.event;
+    items = [];
+    constructor() {
+        void this.load();
+    }
+    async load() {
+        const all = await (0, persistence_1.readTodos)();
+        // Separar pendientes y completadas
+        const pending = all.filter((i) => !i.completed);
+        const done = all.filter((i) => i.completed);
+        // Orden: más recientes al principio según date_added / date_finished
+        pending.sort((a, b) => b.date_added.localeCompare(a.date_added));
+        done.sort((a, b) => {
+            // si ambas tienen date_finished
+            if (b.date_finished && a.date_finished) {
+                return b.date_finished.localeCompare(a.date_finished);
+            }
+            return 0;
+        });
+        this.items = [...pending, ...done];
+        this._onDidChange.fire();
+    }
+    refresh() {
+        void this.load();
+    }
+    getTreeItem(item) {
+        // Mostrar texto con fecha/hora y (finished) si aplica
+        const added = formatDate(item.date_added);
+        const finishedPart = item.completed && item.date_finished
+            ? ` (finished: ${formatDate(item.date_finished)})`
+            : "";
+        const label = `${added} – ${item.text}${finishedPart}`;
+        const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+        // contextual value para iconos/menus
+        treeItem.contextValue = item.completed ? "done" : "pending";
+        treeItem.tooltip = label;
+        // ícono de tarea pendiente vs completada
+        treeItem.iconPath = new vscode.ThemeIcon(item.completed ? "check" : "circle-outline");
+        return treeItem;
+    }
+    getChildren() {
+        return Promise.resolve(this.items);
+    }
+    async add(text) {
+        const todos = await (0, persistence_1.readTodos)();
+        const todo = (0, persistence_1.makeTodo)(text);
+        todos.push(todo);
+        await (0, persistence_1.writeTodos)(todos);
+        this.refresh();
+    }
+    async complete(item) {
+        const todos = await (0, persistence_1.readTodos)();
+        const idx = todos.findIndex((i) => i.id === item.id);
+        if (idx !== -1) {
+            todos[idx].completed = true;
+            todos[idx].date_finished = new Date().toISOString();
+            await (0, persistence_1.writeTodos)(todos);
+        }
+        this.refresh();
+    }
+    async uncomplete(item) {
+        const todos = await (0, persistence_1.readTodos)();
+        const idx = todos.findIndex((i) => i.id === item.id);
+        if (idx !== -1) {
+            todos[idx].completed = false;
+            todos[idx].date_finished = null;
+            await (0, persistence_1.writeTodos)(todos);
+        }
+        this.refresh();
+    }
+}
+exports.TodoProvider = TodoProvider;
+function formatDate(iso) {
+    const d = new Date(iso);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${y}-${m}-${day} ${hh}:${mm}`;
+}
+
+
+/***/ }),
+/* 4 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.readTodos = readTodos;
 exports.writeTodos = writeTodos;
 exports.makeTodo = makeTodo;
 const vscode = __importStar(__webpack_require__(2));
 const uuidv4 = (...args) => {
-    const { v4 } = __webpack_require__(4);
+    const { v4 } = __webpack_require__(5);
     return v4(...args);
 };
 const FILE_NAME = "todo.json";
@@ -157,7 +284,7 @@ function makeTodo(text) {
 
 
 /***/ }),
-/* 4 */
+/* 5 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -177,20 +304,20 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   validate: () => (/* reexport safe */ _validate_js__WEBPACK_IMPORTED_MODULE_12__["default"]),
 /* harmony export */   version: () => (/* reexport safe */ _version_js__WEBPACK_IMPORTED_MODULE_13__["default"])
 /* harmony export */ });
-/* harmony import */ var _max_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(5);
-/* harmony import */ var _nil_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(6);
-/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(7);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(10);
-/* harmony import */ var _v1_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(11);
-/* harmony import */ var _v1ToV6_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(14);
-/* harmony import */ var _v3_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(15);
-/* harmony import */ var _v4_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(18);
-/* harmony import */ var _v5_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(20);
-/* harmony import */ var _v6_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(22);
-/* harmony import */ var _v6ToV1_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(23);
-/* harmony import */ var _v7_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(24);
-/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(8);
-/* harmony import */ var _version_js__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(25);
+/* harmony import */ var _max_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(6);
+/* harmony import */ var _nil_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(7);
+/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(8);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(11);
+/* harmony import */ var _v1_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(12);
+/* harmony import */ var _v1ToV6_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(15);
+/* harmony import */ var _v3_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(16);
+/* harmony import */ var _v4_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(19);
+/* harmony import */ var _v5_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(21);
+/* harmony import */ var _v6_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(23);
+/* harmony import */ var _v6ToV1_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(24);
+/* harmony import */ var _v7_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(25);
+/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(9);
+/* harmony import */ var _version_js__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(26);
 
 
 
@@ -205,17 +332,6 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-
-
-/***/ }),
-/* 5 */
-/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
-/* harmony export */ });
-/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ('ffffffff-ffff-ffff-ffff-ffffffffffff');
 
 
 /***/ }),
@@ -226,7 +342,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ('00000000-0000-0000-0000-000000000000');
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ('ffffffff-ffff-ffff-ffff-ffffffffffff');
 
 
 /***/ }),
@@ -237,7 +353,18 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ('00000000-0000-0000-0000-000000000000');
+
+
+/***/ }),
+/* 8 */
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(9);
 
 function parse(uuid) {
     if (!(0,_validate_js__WEBPACK_IMPORTED_MODULE_0__["default"])(uuid)) {
@@ -250,14 +377,14 @@ function parse(uuid) {
 
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _regex_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(9);
+/* harmony import */ var _regex_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(10);
 
 function validate(uuid) {
     return typeof uuid === 'string' && _regex_js__WEBPACK_IMPORTED_MODULE_0__["default"].test(uuid);
@@ -266,7 +393,7 @@ function validate(uuid) {
 
 
 /***/ }),
-/* 9 */
+/* 10 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -277,7 +404,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 /***/ }),
-/* 10 */
+/* 11 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -285,7 +412,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__),
 /* harmony export */   unsafeStringify: () => (/* binding */ unsafeStringify)
 /* harmony export */ });
-/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
+/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(9);
 
 const byteToHex = [];
 for (let i = 0; i < 256; ++i) {
@@ -324,7 +451,7 @@ function stringify(arr, offset = 0) {
 
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -332,8 +459,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__),
 /* harmony export */   updateV1State: () => (/* binding */ updateV1State)
 /* harmony export */ });
-/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(12);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
+/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
 
 
 const _state = {};
@@ -420,14 +547,14 @@ function v1Bytes(rnds, msecs, nsecs, clockseq, node, buf, offset = 0) {
 
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (/* binding */ rng)
 /* harmony export */ });
-/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(14);
 
 const rnds8Pool = new Uint8Array(256);
 let poolPtr = rnds8Pool.length;
@@ -441,21 +568,21 @@ function rng() {
 
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ ((module) => {
 
 module.exports = require("node:crypto");
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (/* binding */ v1ToV6)
 /* harmony export */ });
-/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
+/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
 
 
 function v1ToV6(uuid) {
@@ -469,7 +596,7 @@ function _v1ToV6(v1Bytes) {
 
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -478,8 +605,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   URL: () => (/* reexport safe */ _v35_js__WEBPACK_IMPORTED_MODULE_1__.URL),
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _md5_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(16);
-/* harmony import */ var _v35_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(17);
+/* harmony import */ var _md5_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(17);
+/* harmony import */ var _v35_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(18);
 
 
 
@@ -492,14 +619,14 @@ v3.URL = _v35_js__WEBPACK_IMPORTED_MODULE_1__.URL;
 
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(14);
 
 function md5(bytes) {
     if (Array.isArray(bytes)) {
@@ -514,7 +641,7 @@ function md5(bytes) {
 
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -524,8 +651,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "default": () => (/* binding */ v35),
 /* harmony export */   stringToBytes: () => (/* binding */ stringToBytes)
 /* harmony export */ });
-/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
+/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
 
 
 function stringToBytes(str) {
@@ -565,16 +692,16 @@ function v35(version, hash, value, namespace, buf, offset) {
 
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _native_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(19);
-/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(12);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(10);
+/* harmony import */ var _native_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(20);
+/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(13);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(11);
 
 
 
@@ -608,20 +735,20 @@ function v4(options, buf, offset) {
 
 
 /***/ }),
-/* 19 */
+/* 20 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(14);
 
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ({ randomUUID: node_crypto__WEBPACK_IMPORTED_MODULE_0__.randomUUID });
 
 
 /***/ }),
-/* 20 */
+/* 21 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -630,8 +757,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   URL: () => (/* reexport safe */ _v35_js__WEBPACK_IMPORTED_MODULE_1__.URL),
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _sha1_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(21);
-/* harmony import */ var _v35_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(17);
+/* harmony import */ var _sha1_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(22);
+/* harmony import */ var _v35_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(18);
 
 
 
@@ -644,14 +771,14 @@ v5.URL = _v35_js__WEBPACK_IMPORTED_MODULE_1__.URL;
 
 
 /***/ }),
-/* 21 */
+/* 22 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
+/* harmony import */ var node_crypto__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(14);
 
 function sha1(bytes) {
     if (Array.isArray(bytes)) {
@@ -666,16 +793,16 @@ function sha1(bytes) {
 
 
 /***/ }),
-/* 22 */
+/* 23 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(10);
-/* harmony import */ var _v1_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
-/* harmony import */ var _v1ToV6_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(14);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(11);
+/* harmony import */ var _v1_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(12);
+/* harmony import */ var _v1ToV6_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(15);
 
 
 
@@ -696,15 +823,15 @@ function v6(options, buf, offset) {
 
 
 /***/ }),
-/* 23 */
+/* 24 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (/* binding */ v6ToV1)
 /* harmony export */ });
-/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(7);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
+/* harmony import */ var _parse_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
 
 
 function v6ToV1(uuid) {
@@ -718,7 +845,7 @@ function _v6ToV1(v6Bytes) {
 
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -726,8 +853,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__),
 /* harmony export */   updateV7State: () => (/* binding */ updateV7State)
 /* harmony export */ });
-/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(12);
-/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(10);
+/* harmony import */ var _rng_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(13);
+/* harmony import */ var _stringify_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(11);
 
 
 const _state = {};
@@ -796,14 +923,14 @@ function v7Bytes(rnds, msecs, seq, buf, offset = 0) {
 
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(8);
+/* harmony import */ var _validate_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(9);
 
 function version(uuid) {
     if (!(0,_validate_js__WEBPACK_IMPORTED_MODULE_0__["default"])(uuid)) {
@@ -815,7 +942,7 @@ function version(uuid) {
 
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
 
@@ -853,91 +980,401 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.TodoProvider = void 0;
+exports.registerChangelog = registerChangelog;
 const vscode = __importStar(__webpack_require__(2));
-const persistence_1 = __webpack_require__(3);
-class TodoProvider {
+const provider_1 = __webpack_require__(28);
+const persistence_1 = __webpack_require__(29);
+function registerChangelog(context) {
+    const provider = new provider_1.ChangelogProvider();
+    // Registrar el TreeDataProvider para la vista de changelog
+    vscode.window.registerTreeDataProvider("changelogView", provider);
+    // Registrar comandos
+    context.subscriptions.push(
+    // Refrescar la vista
+    vscode.commands.registerCommand("changelog.refresh", () => {
+        provider.refresh();
+    }), 
+    // Comando para agregar una nueva versión
+    vscode.commands.registerCommand("changelog.addVersion", async () => {
+        const version = await vscode.window.showInputBox({
+            prompt: "New version (e.g., 1.0.0)",
+        });
+        if (!version)
+            return;
+        const date = new Date().toISOString().split("T")[0];
+        const all = await (0, persistence_1.readChangelog)();
+        // Evitar duplicados
+        const exists = all.some((v) => v.version === version);
+        if (exists) {
+            vscode.window.showWarningMessage(`Version "${version}" already exists!`);
+            return;
+        }
+        all.push({
+            version,
+            date,
+            sections: {
+                Additions: [],
+                Changes: [],
+                Deprecations: [],
+                Fixes: [],
+                Removals: [],
+                "Security Changes": [],
+            },
+        });
+        await (0, persistence_1.writeChangelog)(all);
+        provider.refresh();
+    }), 
+    // Comando para agregar una entrada en una sección
+    vscode.commands.registerCommand("changelog.addEntry", async (node) => {
+        const versionObj = node.version;
+        const sectionName = node.name;
+        const text = await vscode.window.showInputBox({
+            prompt: `Add entry to ${sectionName}`,
+            placeHolder: "Describe the change...",
+        });
+        if (!text)
+            return;
+        const all = await (0, persistence_1.readChangelog)();
+        const versionIdx = all.findIndex((v) => v.version === versionObj.version);
+        if (versionIdx === -1)
+            return;
+        all[versionIdx].sections[sectionName].push({
+            text
+        });
+        await (0, persistence_1.writeChangelog)(all);
+        provider.refresh();
+    }), 
+    // Comando para editar una entrada existente
+    vscode.commands.registerCommand("changelog.editEntry", async (node) => {
+        // node.text = texto actual
+        // node.version = objeto versión
+        // node.section = nombre de sección
+        const newText = await vscode.window.showInputBox({
+            prompt: "Edit entry text",
+            value: node.text,
+        });
+        if (!newText)
+            return;
+        const all = await (0, persistence_1.readChangelog)();
+        const versionIdx = all.findIndex((v) => v.version === node.version.version);
+        if (versionIdx === -1)
+            return;
+        const secArr = all[versionIdx].sections[node.section] || [];
+        const entryIdx = secArr.findIndex((e) => e.text === node.text);
+        if (entryIdx === -1)
+            return;
+        secArr[entryIdx].text = newText;
+        await (0, persistence_1.writeChangelog)(all);
+        provider.refresh();
+    }), 
+    // Comando para eliminar una entrada
+    vscode.commands.registerCommand("changelog.removeEntry", async (node) => {
+        const confirm = await vscode.window.showWarningMessage(`Remove this entry?\n"${node.text}"`, { modal: true }, "Yes");
+        if (confirm !== "Yes")
+            return;
+        const all = await (0, persistence_1.readChangelog)();
+        const versionIdx = all.findIndex((v) => v.version === node.version.version);
+        if (versionIdx === -1)
+            return;
+        const secArr = all[versionIdx].sections[node.section] || [];
+        all[versionIdx].sections[node.section] = secArr.filter((e) => e.text !== node.text);
+        await (0, persistence_1.writeChangelog)(all);
+        provider.refresh();
+    }), 
+    // Comando para eliminar una versión completa
+    vscode.commands.registerCommand("changelog.removeVersion", async (node) => {
+        const confirm = await vscode.window.showWarningMessage(`Remove version "${node.version}" and all its entries?`, { modal: true }, "Yes");
+        if (confirm !== "Yes")
+            return;
+        const all = await (0, persistence_1.readChangelog)();
+        const filtered = all.filter((v) => v.version !== node.version);
+        await (0, persistence_1.writeChangelog)(filtered);
+        provider.refresh();
+    }));
+}
+
+
+/***/ }),
+/* 28 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ChangelogProvider = void 0;
+const vscode = __importStar(__webpack_require__(2));
+const persistence_1 = __webpack_require__(29);
+// Orden fijo de secciones
+const sectionOrder = [
+    "Additions",
+    "Changes",
+    "Deprecations",
+    "Fixes",
+    "Removals",
+    "Security Changes",
+];
+class ChangelogProvider {
     _onDidChange = new vscode.EventEmitter();
     onDidChangeTreeData = this._onDidChange.event;
-    items = [];
+    versions = [];
     constructor() {
         void this.load();
     }
     async load() {
-        const all = await (0, persistence_1.readTodos)();
-        // Separar pendientes y completadas
-        const pending = all.filter((i) => !i.completed);
-        const done = all.filter((i) => i.completed);
-        // Orden: más recientes al principio según date_added / date_finished
-        pending.sort((a, b) => b.date_added.localeCompare(a.date_added));
-        done.sort((a, b) => {
-            // si ambas tienen date_finished
-            if (b.date_finished && a.date_finished) {
-                return b.date_finished.localeCompare(a.date_finished);
-            }
-            return 0;
-        });
-        this.items = [...pending, ...done];
+        this.versions = await (0, persistence_1.readChangelog)();
         this._onDidChange.fire();
     }
     refresh() {
         void this.load();
     }
-    getTreeItem(item) {
-        // Mostrar texto con fecha/hora y (finished) si aplica
-        const added = formatDate(item.date_added);
-        const finishedPart = item.completed && item.date_finished
-            ? ` (finished: ${formatDate(item.date_finished)})`
-            : "";
-        const label = `${added} – ${item.text}${finishedPart}`;
-        const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-        // contextual value para iconos/menus
-        treeItem.contextValue = item.completed ? "done" : "pending";
-        treeItem.tooltip = label;
-        // ícono de tarea pendiente vs completada
-        treeItem.iconPath = new vscode.ThemeIcon(item.completed ? "check" : "circle-outline");
-        return treeItem;
-    }
-    getChildren() {
-        return Promise.resolve(this.items);
-    }
-    async add(text) {
-        const todos = await (0, persistence_1.readTodos)();
-        const todo = (0, persistence_1.makeTodo)(text);
-        todos.push(todo);
-        await (0, persistence_1.writeTodos)(todos);
-        this.refresh();
-    }
-    async complete(item) {
-        const todos = await (0, persistence_1.readTodos)();
-        const idx = todos.findIndex((i) => i.id === item.id);
-        if (idx !== -1) {
-            todos[idx].completed = true;
-            todos[idx].date_finished = new Date().toISOString();
-            await (0, persistence_1.writeTodos)(todos);
+    getTreeItem(element) {
+        // ➤ Nodo de versión (solo aquí mostramos fecha)
+        if (element.kind === "version") {
+            const label = `${element.version}   ${element.date}`;
+            const ti = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Collapsed);
+            ti.contextValue = "changelogVersion"; // para eliminar versión
+            return ti;
         }
-        this.refresh();
-    }
-    async uncomplete(item) {
-        const todos = await (0, persistence_1.readTodos)();
-        const idx = todos.findIndex((i) => i.id === item.id);
-        if (idx !== -1) {
-            todos[idx].completed = false;
-            todos[idx].date_finished = null;
-            await (0, persistence_1.writeTodos)(todos);
+        // ➤ Nodo de sección (Additions, Changes, etc)
+        if (element.kind === "section") {
+            const ti = new vscode.TreeItem(`${element.name} (${element.count})`, vscode.TreeItemCollapsibleState.Collapsed);
+            ti.contextValue = "changelogSection"; // para añadir entrada
+            return ti;
         }
-        this.refresh();
+        // ➤ Nodo de entrada individual
+        if (element.kind === "entry") {
+            // Prefijo con el símbolo deseado 🔸
+            const ti = new vscode.TreeItem(`🔸 ${element.text}`, vscode.TreeItemCollapsibleState.None);
+            ti.contextValue = "changelogEntry"; // para editar/eliminar
+            return ti;
+        }
+        // ➤ Fallback
+        return new vscode.TreeItem("Unknown item");
+    }
+    getChildren(element) {
+        // ✨ Si no hay elemento, devolvemos las versiones
+        if (!element) {
+            return Promise.resolve(this.versions
+                .sort((a, b) => b.date.localeCompare(a.date)) // versiones más recientes primero
+                .map((v) => ({
+                kind: "version",
+                ...v,
+            })));
+        }
+        // ✨ Si el elemento es una versión, devolvemos sus secciones
+        if (element.kind === "version") {
+            return Promise.resolve(sectionOrder.map((sectionName) => ({
+                kind: "section",
+                name: sectionName,
+                count: element.sections[sectionName]?.length ?? 0,
+                version: element,
+            })));
+        }
+        // ✨ Si el elemento es una sección, devolvemos sus entradas
+        if (element.kind === "section") {
+            const ver = element.version;
+            const listOfEntries = ver.sections[element.name] ?? [];
+            return Promise.resolve(listOfEntries.map((entry) => ({
+                kind: "entry",
+                text: entry.text,
+                version: ver,
+                section: element.name,
+            })));
+        }
+        // ✨ Si no hay nada más
+        return Promise.resolve([]);
     }
 }
-exports.TodoProvider = TodoProvider;
-function formatDate(iso) {
-    const d = new Date(iso);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    return `${y}-${m}-${day} ${hh}:${mm}`;
+exports.ChangelogProvider = ChangelogProvider;
+
+
+/***/ }),
+/* 29 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.readChangelog = readChangelog;
+exports.writeChangelog = writeChangelog;
+const vscode = __importStar(__webpack_require__(2));
+const FILE_NAME = "CHANGELOG.md";
+function getFileUri() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+        vscode.window.showWarningMessage("Open a folder to use the changelog.");
+        return null;
+    }
+    return vscode.Uri.joinPath(folders[0].uri, FILE_NAME);
+}
+async function readChangelog() {
+    const uri = getFileUri();
+    if (!uri)
+        return [];
+    try {
+        const bytes = await vscode.workspace.fs.readFile(uri);
+        const md = Buffer.from(bytes).toString("utf8");
+        return parseMd(md);
+    }
+    catch {
+        return [];
+    }
+}
+async function writeChangelog(versions) {
+    const uri = getFileUri();
+    if (!uri)
+        return;
+    const md = generateMd(versions);
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(md, "utf8"));
+}
+// ---- PARSE / GENERATE UTILS ---- //
+function parseMd(md) {
+    const lines = md.split(/\r?\n/);
+    const versions = [];
+    let current = null;
+    let section = null;
+    const sectionNames = [
+        "Additions",
+        "Changes",
+        "Deprecations",
+        "Fixes",
+        "Removals",
+        "Security Changes",
+    ];
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        // Match version line: ## VERSION YYYY-MM-DD
+        const verMatch = line.match(/^##\s+(\S+)\s+(\d{4}-\d{2}-\d{2})$/);
+        if (verMatch) {
+            current = {
+                version: verMatch[1],
+                date: verMatch[2],
+                sections: {},
+            };
+            section = null;
+            for (const sn of sectionNames) {
+                current.sections[sn] = [];
+            }
+            versions.push(current);
+            continue;
+        }
+        if (!current)
+            continue;
+        // Match section heading
+        const secMatch = sectionNames.find((sn) => line === `### ${sn}`);
+        if (secMatch) {
+            section = secMatch;
+            continue;
+        }
+        // Match entry line: "- [YYYY-MM-DD HH:mm] some text"
+        if (section && line.startsWith("- ")) {
+            // entry could contain a date in brackets
+            const entryReg = line.match(/^-\s+\[([0-9T:\- ]+)\]\s+(.+)$/);
+            if (entryReg) {
+                const entryDate = entryReg[1].trim();
+                const text = entryReg[2].trim();
+                current.sections[section].push({
+                    text,
+                });
+            }
+            else {
+                // If no bracketed date, fallback
+                const text = line.replace(/^- /, "").trim();
+                current.sections[section].push({
+                    text,
+                });
+            }
+        }
+    }
+    return versions;
+}
+function generateMd(versions) {
+    const lines = [];
+    for (const v of versions) {
+        // Version header
+        lines.push(`## ${v.version} ${v.date}`);
+        for (const secName of Object.keys(v.sections)) {
+            lines.push("");
+            lines.push(`### ${secName}`);
+            const entries = v.sections[secName];
+            if (entries.length === 0) {
+                // Section placeholder if you want explicit 0 entries
+                // lines.push(`- (no entries)`);
+            }
+            else {
+                for (const e of entries) {
+                    lines.push(`- ${e.text}`);
+                }
+            }
+        }
+        // Blank line between versions
+        lines.push("");
+    }
+    return lines.join("\n");
 }
 
 
@@ -1006,9 +1443,15 @@ var exports = __webpack_exports__;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.activate = activate;
 exports.deactivate = deactivate;
-const todo_1 = __webpack_require__(1);
+const index_1 = __webpack_require__(1); // Registrar todo
+const index_2 = __webpack_require__(27); // Registrar changelog
 function activate(context) {
-    (0, todo_1.registerTodo)(context);
+    // Registrar módulo TO-DO
+    (0, index_1.registerTodo)(context);
+    // Registrar módulo CHANGELOG
+    (0, index_2.registerChangelog)(context);
+    // Opcional: log para saber que la extensión se activó
+    console.log('✨ TO-DO Changelog Manager is now active!');
 }
 function deactivate() { }
 

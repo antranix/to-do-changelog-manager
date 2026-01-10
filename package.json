@@ -6,34 +6,77 @@
   "engines": {
     "vscode": "^1.108.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
 
   "activationEvents": [
     "onView:todoView",
+    "onView:changelogView",
     "onCommand:todo.add",
     "onCommand:todo.complete",
     "onCommand:todo.uncomplete",
-    "onCommand:todo.refresh"
+    "onCommand:todo.refresh",
+    "onCommand:todo.edit",
+    "onCommand:todo.remove",
+    "onCommand:changelog.refresh",
+    "onCommand:changelog.addVersion",
+    "onCommand:changelog.addEntry",
+    "onCommand:changelog.editEntry",
+    "onCommand:changelog.removeEntry",
+    "onCommand:changelog.removeVersion"
   ],
 
-  "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "todo.add",
-        "title": "Add Task"
+        "title": "➕"
       },
       {
         "command": "todo.complete",
-        "title": "Mark Complete"
+        "title": "✔️"
       },
       {
         "command": "todo.uncomplete",
-        "title": "Mark Uncomplete"
+        "title": "🔙"
       },
       {
         "command": "todo.refresh",
-        "title": "Refresh"
+        "title": "↻"
+      },
+      {
+        "command": "todo.edit",
+        "title": "✏️"
+      },
+      {
+        "command": "todo.remove",
+        "title": "✖️"
+      },
+      {
+        "command": "changelog.refresh",
+        "title": "↻"
+      },
+      {
+        "command": "changelog.addVersion",
+        "title": "➕"
+      },
+      {
+        "command": "changelog.addEntry",
+        "title": "➕"
+      },
+      {
+        "command": "changelog.editEntry",
+        "title": "✏️"
+      },
+      {
+        "command": "changelog.removeEntry",
+        "title": "✖️"
+      },
+      {
+        "command": "changelog.removeVersion",
+        "title": "✖️"
       }
     ],
 
@@ -43,6 +86,11 @@
           "id": "todoContainer",
           "title": "TO-DO",
           "icon": "dist/resources/img/todo-list.svg"
+        },
+        {
+          "id": "changelogContainer",
+          "title": "CHANGELOG",
+          "icon": "dist/resources/img/changelog.svg"
         }
       ]
     },
@@ -52,6 +100,12 @@
         {
           "id": "todoView",
           "name": "TO-DO"
+        }
+      ],
+      "changelogContainer": [
+        {
+          "id": "changelogView",
+          "name": "CHANGELOG"
         }
       ]
     },
@@ -67,22 +121,65 @@
           "command": "todo.refresh",
           "when": "view == todoView",
           "group": "navigation"
+        },
+        {
+          "command": "changelog.addVersion",
+          "when": "view == changelogView",
+          "group": "navigation"
+        },
+        {
+          "command": "changelog.refresh",
+          "when": "view == changelogView",
+          "group": "navigation"
         }
       ],
+
       "view/item/context": [
         {
           "command": "todo.complete",
-          "when": "view == todoView && viewItem == pending",
+          "when": "view == todoView && viewItem == pendingTask",
           "group": "inline"
         },
         {
           "command": "todo.uncomplete",
-          "when": "view == todoView && viewItem == done",
+          "when": "view == todoView && viewItem == doneTask",
+          "group": "inline"
+        },
+        {
+          "command": "todo.edit",
+          "when": "view == todoView && (viewItem == pendingTask || viewItem == doneTask)",
+          "group": "inline"
+        },
+        {
+          "command": "todo.remove",
+          "when": "view == todoView && (viewItem == pendingTask || viewItem == doneTask)",
+          "group": "inline"
+        },
+
+        {
+          "command": "changelog.addEntry",
+          "when": "view == changelogView && viewItem == changelogSection",
+          "group": "inline"
+        },
+        {
+          "command": "changelog.editEntry",
+          "when": "view == changelogView && viewItem == changelogEntry",
+          "group": "inline"
+        },
+        {
+          "command": "changelog.removeEntry",
+          "when": "view == changelogView && viewItem == changelogEntry",
+          "group": "inline"
+        },
+        {
+          "command": "changelog.removeVersion",
+          "when": "view == changelogView && viewItem == changelogVersion",
           "group": "inline"
         }
       ]
     }
   },
+
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "webpack",
@@ -94,11 +191,12 @@
     "lint": "eslint src",
     "test": "vscode-test"
   },
+
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "@types/uuid": "^10.0.0",
     "@types/vscode": "^1.108.0",
+    "@types/uuid": "^10.0.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "copy-webpack-plugin": "^13.0.1",
@@ -109,6 +207,7 @@
     "webpack": "^5.104.1",
     "webpack-cli": "^6.0.1"
   },
+
   "dependencies": {
     "uuid": "^13.0.0"
   }
