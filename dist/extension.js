@@ -987,15 +987,14 @@ const persistence_1 = __webpack_require__(29);
 function registerChangelog(context) {
     const provider = new provider_1.ChangelogProvider();
     // Registrar el TreeDataProvider para la vista de changelog
-    vscode.window.registerTreeDataProvider("changelogView", provider);
-    // Registrar comandos
-    context.subscriptions.push(
+    const treeReg = vscode.window.registerTreeDataProvider("changelogView", provider);
+    context.subscriptions.push(treeReg);
     // Refrescar la vista
-    vscode.commands.registerCommand("changelog.refresh", () => {
+    context.subscriptions.push(vscode.commands.registerCommand("changelog.refresh", () => {
         provider.refresh();
-    }), 
+    }));
     // Comando para agregar una nueva versión
-    vscode.commands.registerCommand("changelog.addVersion", async () => {
+    context.subscriptions.push(vscode.commands.registerCommand("changelog.addVersion", async () => {
         const version = await vscode.window.showInputBox({
             prompt: "New version (e.g., 1.0.0)",
         });
@@ -1009,7 +1008,7 @@ function registerChangelog(context) {
             vscode.window.showWarningMessage(`Version "${version}" already exists!`);
             return;
         }
-        all.push({
+        all.unshift({
             version,
             date,
             sections: {
@@ -1023,13 +1022,17 @@ function registerChangelog(context) {
         });
         await (0, persistence_1.writeChangelog)(all);
         provider.refresh();
-    }), 
+    }));
     // Comando para agregar una entrada en una sección
-    vscode.commands.registerCommand("changelog.addEntry", async (node) => {
-        const versionObj = node.version;
-        const sectionName = node.name;
+    context.subscriptions.push(vscode.commands.registerCommand("changelog.addEntry", async (node) => {
+        const versionObj = node.version; // objeto versión
+        // ✅ IMPORTANTE:
+        // - provider nuevo: node.key (sin emoji)
+        // - provider viejo: node.name (posiblemente con emoji)
+        const sectionKey = node.key ?? node.name;
+        const sectionLabel = node.label ?? node.name ?? sectionKey;
         const text = await vscode.window.showInputBox({
-            prompt: `Add entry to ${sectionName}`,
+            prompt: `Add entry to ${sectionLabel}`,
             placeHolder: "Describe the change...",
         });
         if (!text)
@@ -1038,17 +1041,16 @@ function registerChangelog(context) {
         const versionIdx = all.findIndex((v) => v.version === versionObj.version);
         if (versionIdx === -1)
             return;
-        all[versionIdx].sections[sectionName].push({
-            text
-        });
+        // ✅ Blindaje: si la sección no existe (o viene undefined), la creamos
+        if (!all[versionIdx].sections[sectionKey]) {
+            all[versionIdx].sections[sectionKey] = [];
+        }
+        all[versionIdx].sections[sectionKey].push({ text });
         await (0, persistence_1.writeChangelog)(all);
         provider.refresh();
-    }), 
+    }));
     // Comando para editar una entrada existente
-    vscode.commands.registerCommand("changelog.editEntry", async (node) => {
-        // node.text = texto actual
-        // node.version = objeto versión
-        // node.section = nombre de sección
+    context.subscriptions.push(vscode.commands.registerCommand("changelog.editEntry", async (node) => {
         const newText = await vscode.window.showInputBox({
             prompt: "Edit entry text",
             value: node.text,
@@ -1059,16 +1061,18 @@ function registerChangelog(context) {
         const versionIdx = all.findIndex((v) => v.version === node.version.version);
         if (versionIdx === -1)
             return;
-        const secArr = all[versionIdx].sections[node.section] || [];
+        // ✅ Blindaje: garantiza arreglo existente
+        const secArr = all[versionIdx].sections[node.section] ?? [];
+        all[versionIdx].sections[node.section] = secArr;
         const entryIdx = secArr.findIndex((e) => e.text === node.text);
         if (entryIdx === -1)
             return;
         secArr[entryIdx].text = newText;
         await (0, persistence_1.writeChangelog)(all);
         provider.refresh();
-    }), 
+    }));
     // Comando para eliminar una entrada
-    vscode.commands.registerCommand("changelog.removeEntry", async (node) => {
+    context.subscriptions.push(vscode.commands.registerCommand("changelog.removeEntry", async (node) => {
         const confirm = await vscode.window.showWarningMessage(`Remove this entry?\n"${node.text}"`, { modal: true }, "Yes");
         if (confirm !== "Yes")
             return;
@@ -1076,13 +1080,13 @@ function registerChangelog(context) {
         const versionIdx = all.findIndex((v) => v.version === node.version.version);
         if (versionIdx === -1)
             return;
-        const secArr = all[versionIdx].sections[node.section] || [];
+        const secArr = all[versionIdx].sections[node.section] ?? [];
         all[versionIdx].sections[node.section] = secArr.filter((e) => e.text !== node.text);
         await (0, persistence_1.writeChangelog)(all);
         provider.refresh();
-    }), 
+    }));
     // Comando para eliminar una versión completa
-    vscode.commands.registerCommand("changelog.removeVersion", async (node) => {
+    context.subscriptions.push(vscode.commands.registerCommand("changelog.removeVersion", async (node) => {
         const confirm = await vscode.window.showWarningMessage(`Remove version "${node.version}" and all its entries?`, { modal: true }, "Yes");
         if (confirm !== "Yes")
             return;
@@ -1136,14 +1140,13 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ChangelogProvider = void 0;
 const vscode = __importStar(__webpack_require__(2));
 const persistence_1 = __webpack_require__(29);
-// Orden fijo de secciones
-const sectionOrder = [
-    "Additions",
-    "Changes",
-    "Deprecations",
-    "Fixes",
-    "Removals",
-    "Security Changes",
+const sections = [
+    { key: "Additions", label: "🆕 Additions" },
+    { key: "Changes", label: "🔃 Changes" },
+    { key: "Deprecations", label: "⬇️ Deprecations" },
+    { key: "Fixes", label: "🆗 Fixes" },
+    { key: "Removals", label: "🗑️ Removals" },
+    { key: "Security Changes", label: "🛡️ Security Changes" },
 ];
 class ChangelogProvider {
     _onDidChange = new vscode.EventEmitter();
@@ -1153,67 +1156,66 @@ class ChangelogProvider {
         void this.load();
     }
     async load() {
-        this.versions = await (0, persistence_1.readChangelog)();
+        const raw = await (0, persistence_1.readChangelog)();
+        // Normaliza a VersionNode
+        this.versions = raw.map((v) => ({
+            kind: "version",
+            version: v.version,
+            date: v.date,
+            sections: v.sections,
+        }));
         this._onDidChange.fire();
     }
     refresh() {
         void this.load();
     }
     getTreeItem(element) {
-        // ➤ Nodo de versión (solo aquí mostramos fecha)
         if (element.kind === "version") {
             const label = `${element.version}   ${element.date}`;
             const ti = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Collapsed);
-            ti.contextValue = "changelogVersion"; // para eliminar versión
+            ti.contextValue = "changelogVersion";
             return ti;
         }
-        // ➤ Nodo de sección (Additions, Changes, etc)
         if (element.kind === "section") {
-            const ti = new vscode.TreeItem(`${element.name} (${element.count})`, vscode.TreeItemCollapsibleState.Collapsed);
-            ti.contextValue = "changelogSection"; // para añadir entrada
+            const ti = new vscode.TreeItem(`${element.label} (${element.count})`, vscode.TreeItemCollapsibleState.Collapsed);
+            ti.contextValue = "changelogSection";
             return ti;
         }
-        // ➤ Nodo de entrada individual
-        if (element.kind === "entry") {
-            // Prefijo con el símbolo deseado 🔸
-            const ti = new vscode.TreeItem(`🔸 ${element.text}`, vscode.TreeItemCollapsibleState.None);
-            ti.contextValue = "changelogEntry"; // para editar/eliminar
-            return ti;
-        }
-        // ➤ Fallback
-        return new vscode.TreeItem("Unknown item");
+        // entry
+        const ti = new vscode.TreeItem(`🔸 ${element.text}`, vscode.TreeItemCollapsibleState.None);
+        ti.contextValue = "changelogEntry";
+        return ti;
     }
     getChildren(element) {
-        // ✨ Si no hay elemento, devolvemos las versiones
+        // Root: versiones
         if (!element) {
-            return Promise.resolve(this.versions
-                .sort((a, b) => b.date.localeCompare(a.date)) // versiones más recientes primero
-                .map((v) => ({
-                kind: "version",
-                ...v,
-            })));
+            return Promise.resolve([...this.versions].sort((a, b) => b.date.localeCompare(a.date)));
         }
-        // ✨ Si el elemento es una versión, devolvemos sus secciones
+        // Version -> secciones
         if (element.kind === "version") {
-            return Promise.resolve(sectionOrder.map((sectionName) => ({
-                kind: "section",
-                name: sectionName,
-                count: element.sections[sectionName]?.length ?? 0,
-                version: element,
-            })));
+            return Promise.resolve(sections.map(({ key, label }) => {
+                const count = element.sections[key]?.length ?? 0;
+                const node = {
+                    kind: "section",
+                    key,
+                    label,
+                    count,
+                    version: element,
+                };
+                return node;
+            }));
         }
-        // ✨ Si el elemento es una sección, devolvemos sus entradas
+        // Section -> entries
         if (element.kind === "section") {
             const ver = element.version;
-            const listOfEntries = ver.sections[element.name] ?? [];
-            return Promise.resolve(listOfEntries.map((entry) => ({
+            const list = ver.sections[element.key] ?? [];
+            return Promise.resolve(list.map((e) => ({
                 kind: "entry",
-                text: entry.text,
+                text: e.text,
                 version: ver,
-                section: element.name,
+                section: element.key,
             })));
         }
-        // ✨ Si no hay nada más
         return Promise.resolve([]);
     }
 }
@@ -1263,6 +1265,14 @@ exports.readChangelog = readChangelog;
 exports.writeChangelog = writeChangelog;
 const vscode = __importStar(__webpack_require__(2));
 const FILE_NAME = "CHANGELOG.md";
+const SECTION_ORDER = [
+    "Additions",
+    "Changes",
+    "Deprecations",
+    "Fixes",
+    "Removals",
+    "Security Changes",
+];
 function getFileUri() {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
@@ -1271,16 +1281,19 @@ function getFileUri() {
     }
     return vscode.Uri.joinPath(folders[0].uri, FILE_NAME);
 }
+const decoder = new TextDecoder("utf-8");
+const encoder = new TextEncoder();
 async function readChangelog() {
     const uri = getFileUri();
     if (!uri)
         return [];
     try {
         const bytes = await vscode.workspace.fs.readFile(uri);
-        const md = Buffer.from(bytes).toString("utf8");
+        const md = decoder.decode(bytes);
         return parseMd(md);
     }
     catch {
+        // File missing or unreadable -> treat as empty changelog
         return [];
     }
 }
@@ -1289,15 +1302,90 @@ async function writeChangelog(versions) {
     if (!uri)
         return;
     const md = generateMd(versions);
-    await vscode.workspace.fs.writeFile(uri, Buffer.from(md, "utf8"));
+    await vscode.workspace.fs.writeFile(uri, encoder.encode(md));
 }
 // ---- PARSE / GENERATE UTILS ---- //
+function emptySections() {
+    const obj = {};
+    for (const sn of SECTION_ORDER)
+        obj[sn] = [];
+    return obj;
+}
+function normalizeSectionHeading(line) {
+    // Expect: ### Additions
+    const m = line.match(/^###\s+(.+)\s*$/);
+    if (!m)
+        return null;
+    return m[1].trim();
+}
+function parseVersionHeading(line) {
+    // Accept:
+    // ## 1.0.0 2026-01-09
+    // ## [1.0.0] 2026-01-09
+    // ## [1.0.0] - 2026-01-09
+    const m = line.match(/^##\s+(?:\[(.+?)\]|(\S+))\s*(?:-\s*)?(\d{4}-\d{2}-\d{2})\s*$/);
+    if (!m)
+        return null;
+    const version = (m[1] ?? m[2])?.trim();
+    const date = m[3]?.trim();
+    if (!version || !date)
+        return null;
+    return { version, date };
+}
+function parseEntry(line) {
+    // Accept:
+    // - text
+    // - [2026-01-09 12:00] text  (we ignore date, keep text)
+    const m = line.match(/^- (?:\[[^\]]+\]\s*)?(.+)\s*$/);
+    if (!m)
+        return null;
+    return m[1].trim();
+}
 function parseMd(md) {
     const lines = md.split(/\r?\n/);
     const versions = [];
     let current = null;
     let section = null;
-    const sectionNames = [
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line)
+            continue;
+        // Version line
+        const ver = parseVersionHeading(line);
+        if (ver) {
+            current = {
+                version: ver.version,
+                date: ver.date,
+                sections: emptySections(),
+            };
+            section = null;
+            versions.push(current);
+            continue;
+        }
+        if (!current)
+            continue;
+        // Section heading
+        const secName = normalizeSectionHeading(line);
+        if (secName) {
+            // If it's a known section, use it; if unknown, create it dynamically
+            if (!current.sections[secName])
+                current.sections[secName] = [];
+            section = secName;
+            continue;
+        }
+        // Entry line
+        if (section && line.startsWith("- ")) {
+            const text = parseEntry(line);
+            if (!text)
+                continue;
+            current.sections[section].push({ text });
+        }
+    }
+    return versions;
+}
+function generateMd(versions) {
+    const lines = [];
+    const sectionOrder = [
         "Additions",
         "Changes",
         "Deprecations",
@@ -1305,73 +1393,32 @@ function parseMd(md) {
         "Removals",
         "Security Changes",
     ];
-    for (const rawLine of lines) {
-        const line = rawLine.trim();
-        // Match version line: ## VERSION YYYY-MM-DD
-        const verMatch = line.match(/^##\s+(\S+)\s+(\d{4}-\d{2}-\d{2})$/);
-        if (verMatch) {
-            current = {
-                version: verMatch[1],
-                date: verMatch[2],
-                sections: {},
-            };
-            section = null;
-            for (const sn of sectionNames) {
-                current.sections[sn] = [];
-            }
-            versions.push(current);
-            continue;
-        }
-        if (!current)
-            continue;
-        // Match section heading
-        const secMatch = sectionNames.find((sn) => line === `### ${sn}`);
-        if (secMatch) {
-            section = secMatch;
-            continue;
-        }
-        // Match entry line: "- [YYYY-MM-DD HH:mm] some text"
-        if (section && line.startsWith("- ")) {
-            // entry could contain a date in brackets
-            const entryReg = line.match(/^-\s+\[([0-9T:\- ]+)\]\s+(.+)$/);
-            if (entryReg) {
-                const entryDate = entryReg[1].trim();
-                const text = entryReg[2].trim();
-                current.sections[section].push({
-                    text,
-                });
-            }
-            else {
-                // If no bracketed date, fallback
-                const text = line.replace(/^- /, "").trim();
-                current.sections[section].push({
-                    text,
-                });
-            }
-        }
-    }
-    return versions;
-}
-function generateMd(versions) {
-    const lines = [];
-    for (const v of versions) {
-        // Version header
+    // ✅ Copia + orden: más reciente primero
+    const sorted = [...versions].sort((a, b) => {
+        const byDate = b.date.localeCompare(a.date); // YYYY-MM-DD funciona perfecto
+        if (byDate !== 0)
+            return byDate;
+        // Desempate por versión (simple, sin semver estricto)
+        return String(b.version).localeCompare(String(a.version), undefined, {
+            numeric: true,
+        });
+    });
+    for (const v of sorted) {
+        // Filtrar secciones con contenido
+        const sectionsWithEntries = sectionOrder.filter((sec) => (v.sections?.[sec]?.length ?? 0) > 0);
+        // ✅ Si una versión no tiene nada en ninguna sección, puedes:
+        // A) igual mostrar solo el header (sin secciones)
+        // B) o saltarla. Aquí dejo A.
         lines.push(`## ${v.version} ${v.date}`);
-        for (const secName of Object.keys(v.sections)) {
+        // ✅ Solo secciones con elementos
+        for (const secName of sectionsWithEntries) {
             lines.push("");
             lines.push(`### ${secName}`);
             const entries = v.sections[secName];
-            if (entries.length === 0) {
-                // Section placeholder if you want explicit 0 entries
-                // lines.push(`- (no entries)`);
-            }
-            else {
-                for (const e of entries) {
-                    lines.push(`- ${e.text}`);
-                }
+            for (const e of entries) {
+                lines.push(`- ${e.text}`);
             }
         }
-        // Blank line between versions
         lines.push("");
     }
     return lines.join("\n");

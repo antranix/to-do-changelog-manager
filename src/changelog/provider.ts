@@ -1,29 +1,69 @@
 import * as vscode from "vscode";
-import type { ChangelogVersion } from "./types";
+import type { ChangelogEntry, ChangelogVersion } from "./types";
 import { readChangelog } from "./persistence";
 
-// Orden fijo de secciones
-const sectionOrder = [
-  "Additions",
-  "Changes",
-  "Deprecations",
-  "Fixes",
-  "Removals",
-  "Security Changes",
+type SectionKey =
+  | "Additions"
+  | "Changes"
+  | "Deprecations"
+  | "Fixes"
+  | "Removals"
+  | "Security Changes";
+
+const sections: Array<{ key: SectionKey; label: string }> = [
+  { key: "Additions", label: "🆕 Additions" },
+  { key: "Changes", label: "🔃 Changes" },
+  { key: "Deprecations", label: "⬇️ Deprecations" },
+  { key: "Fixes", label: "🆗 Fixes" },
+  { key: "Removals", label: "🗑️ Removals" },
+  { key: "Security Changes", label: "🛡️ Security Changes" },
 ];
 
-export class ChangelogProvider implements vscode.TreeDataProvider<any> {
+type VersionNode = {
+  kind: "version";
+  version: string;
+  date: string;
+  sections: Record<string, ChangelogEntry[]>;
+};
+
+type SectionNode = {
+  kind: "section";
+  key: SectionKey;      // <- key real (sin emoji)
+  label: string;        // <- label bonito (con emoji)
+  count: number;
+  version: VersionNode;
+};
+
+type EntryNode = {
+  kind: "entry";
+  text: string;
+  version: VersionNode;
+  section: SectionKey;
+};
+
+type Node = VersionNode | SectionNode | EntryNode;
+
+export class ChangelogProvider implements vscode.TreeDataProvider<Node> {
   private _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChange.event;
 
-  private versions: ChangelogVersion[] = [];
+  private versions: VersionNode[] = [];
 
   constructor() {
     void this.load();
   }
 
   async load() {
-    this.versions = await readChangelog();
+    const raw = await readChangelog();
+
+    // Normaliza a VersionNode
+    this.versions = raw.map((v) => ({
+      kind: "version",
+      version: v.version,
+      date: v.date,
+      sections: v.sections,
+    }));
+
     this._onDidChange.fire();
   }
 
@@ -31,81 +71,71 @@ export class ChangelogProvider implements vscode.TreeDataProvider<any> {
     void this.load();
   }
 
-  getTreeItem(element: any): vscode.TreeItem {
-    // ➤ Nodo de versión (solo aquí mostramos fecha)
+  getTreeItem(element: Node): vscode.TreeItem {
     if (element.kind === "version") {
-      const label = `${element.version}   ${element.date}`;  
+      const label = `${element.version}   ${element.date}`;
       const ti = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Collapsed);
-      ti.contextValue = "changelogVersion"; // para eliminar versión
+      ti.contextValue = "changelogVersion";
       return ti;
     }
 
-    // ➤ Nodo de sección (Additions, Changes, etc)
     if (element.kind === "section") {
       const ti = new vscode.TreeItem(
-        `${element.name} (${element.count})`,
+        `${element.label} (${element.count})`,
         vscode.TreeItemCollapsibleState.Collapsed
       );
-      ti.contextValue = "changelogSection"; // para añadir entrada
+      ti.contextValue = "changelogSection";
       return ti;
     }
 
-    // ➤ Nodo de entrada individual
-    if (element.kind === "entry") {
-      // Prefijo con el símbolo deseado 🔸
-      const ti = new vscode.TreeItem(
-        `🔸 ${element.text}`,
-        vscode.TreeItemCollapsibleState.None
-      );
-      ti.contextValue = "changelogEntry"; // para editar/eliminar
-      return ti;
-    }
-
-    // ➤ Fallback
-    return new vscode.TreeItem("Unknown item");
+    // entry
+    const ti = new vscode.TreeItem(`🔸 ${element.text}`, vscode.TreeItemCollapsibleState.None);
+    ti.contextValue = "changelogEntry";
+    return ti;
   }
 
-  getChildren(element?: any): Thenable<any[]> {
-    // ✨ Si no hay elemento, devolvemos las versiones
+  getChildren(element?: Node): Thenable<Node[]> {
+    // Root: versiones
     if (!element) {
       return Promise.resolve(
-        this.versions
-          .sort((a, b) => b.date.localeCompare(a.date)) // versiones más recientes primero
-          .map((v) => ({
-            kind: "version",
-            ...v,
-          }))
+        [...this.versions].sort((a, b) => b.date.localeCompare(a.date))
       );
     }
 
-    // ✨ Si el elemento es una versión, devolvemos sus secciones
+    // Version -> secciones
     if (element.kind === "version") {
       return Promise.resolve(
-        sectionOrder.map((sectionName) => ({
-          kind: "section",
-          name: sectionName,
-          count: element.sections[sectionName]?.length ?? 0,
-          version: element,
-        }))
+        sections.map(({ key, label }) => {
+          const count = element.sections[key]?.length ?? 0;
+
+          const node: SectionNode = {
+            kind: "section",
+            key,
+            label,
+            count,
+            version: element,
+          };
+
+          return node;
+        })
       );
     }
 
-    // ✨ Si el elemento es una sección, devolvemos sus entradas
+    // Section -> entries
     if (element.kind === "section") {
-      const ver = element.version as ChangelogVersion;
-      const listOfEntries = ver.sections[element.name] ?? [];
+      const ver = element.version;
+      const list = ver.sections[element.key] ?? [];
 
       return Promise.resolve(
-        listOfEntries.map((entry: any) => ({
+        list.map((e) => ({
           kind: "entry",
-          text: entry.text,
+          text: e.text,
           version: ver,
-          section: element.name,
+          section: element.key,
         }))
       );
     }
 
-    // ✨ Si no hay nada más
     return Promise.resolve([]);
   }
 }
