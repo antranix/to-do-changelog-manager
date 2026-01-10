@@ -3,7 +3,7 @@
   "publisher": "AntranixDEV",
   "displayName": "TO-DO Changelog Manager",
   "description": "Manage your TO-DO tasks and changelogs efficiently.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "engines": {
     "vscode": "^1.108.0"
   },
