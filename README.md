@@ -1,30 +1,134 @@
 # To-Do Changelog Manager
 
-A VS Code extension that helps you manage to-do items and generate changelog entries effortlessly.
+A VS Code extension that helps you manage **to-do tasks** and **project changelogs** directly from dedicated side-panel views, keeping your development workflow organized and your release notes always up to date.
 
-## Features
+The extension provides **two visual interfaces**: one for managing To-Do items and another for building and maintaining a structured `CHANGELOG.md`.
 
-- **Create To-Do Items**: Quickly add tasks to track during development
-- **Generate Changelogs**: Automatically compile to-do items into formatted changelog entries
-- **Organize Tasks**: Categorize items by type (feature, bugfix, improvement, etc.)
+---
 
-## Installation
+## ✨ Features
 
-1. Open VS Code
-2. Go to Extensions (Ctrl+Shift+X / Cmd+Shift+X)
-3. Search for "To-Do Changelog Manager"
-4. Click Install
+### 📝 To-Do Manager View
 
-## Usage
+Manage your development tasks without leaving VS Code:
 
-- Open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
-- Run `To-Do Changelog Manager: Add Item`
-- Generate changelog with `To-Do Changelog Manager: Generate Changelog`
+* ➕ Add new to-do items
+* ✏️ Edit existing tasks
+* 🗑️ Delete tasks
+* ✅ Mark tasks as completed
+* 📌 Organize all tasks in a dedicated Tree View
+* ⚡ Perform actions using **toolbar buttons and context menus**
 
-## Requirements
+---
 
-- VS Code 1.60+
+### 📄 Changelog Manager View
+
+Create and maintain changelogs visually and consistently:
+
+* ➕ Add new versions
+* 🧩 Add entries to predefined changelog sections:
+
+  * Additions
+  * Changes
+  * Fixes
+  * Deprecations
+  * Removals
+  * Security Changes
+* ✏️ Edit or 🗑️ remove individual entries
+* 🔄 Automatically keeps the **latest version at the top**
+* 🧹 Omits empty sections for cleaner output
+* 📁 Persists all changes directly into `CHANGELOG.md`
+
+> The changelog interface and structure are **inspired by**
+> [https://github.com/tobiaswaelde/vscode-simple-changelog](https://github.com/tobiaswaelde/vscode-simple-changelog)
+> and implemented with custom logic and extended functionality.
+
+---
+
+## 🧭 User Interface
+
+The extension adds **two sidebar views** to VS Code:
+
+* **To-Do Manager**
+* **Changelog Manager**
+
+Each view includes:
+
+* Toolbar buttons
+* Context menu actions
+* Real-time updates
+
+No command-only workflow — everything is visual and intuitive.
+
+---
+
+## 🚀 Installation
+
+1. Open **VS Code**
+2. Go to **Extensions** (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+3. Search for **To-Do Changelog Manager**
+4. Click **Install**
+
+---
+
+## 🖼️ Screenshots
+
+### To-Do Manager View
+
+![To-Do Manager View](resources/img/todo-view.png)
+
+Manage your development tasks using an intuitive tree view with quick actions to add, edit, delete, and mark items as completed.
+
+---
+
+### Changelog Manager View
+
+![Changelog Manager View](resources/img/changelog-view.png)
+
+Create and maintain structured changelogs visually, keeping versions ordered and sections clean.
+
+---
+
+## 🛠️ Usage
+
+### To-Do Manager
+
+* Open the **To-Do Manager** view
+* Use the toolbar buttons to:
+
+  * Add tasks
+  * Edit tasks
+  * Delete tasks
+  * Mark tasks as completed
+
+### Changelog Manager
+
+* Open the **Changelog Manager** view
+* Create new versions
+* Add entries to specific sections
+* Maintain a clean and structured `CHANGELOG.md`
+
+All actions are available via toolbar buttons or right-click menus.
+
+---
+
+## 📦 Requirements
+
+* Visual Studio Code **1.60+**
+
+---
 
 ## License
 
-MIT
+[MIT](https://choosealicense.com/licenses/mit/)
+
+---
+
+Si quieres, el siguiente paso lógico sería:
+
+* 🔍 Optimizar keywords para el **Marketplace search**
+* 🎞️ Agregar un **GIF animado**
+* 🧩 Añadir una sección **“Why use this extension?”**
+* 🧪 Alinear README con tu `package.json` (comandos, vistas, contributes)
+
+Dime y lo dejamos **nivel extensión top** 🚀
