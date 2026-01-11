@@ -1,8 +1,8 @@
 {
-  "name": "to-do-changelog-manager",
+  "name": "to-do-manager",
   "publisher": "AntranixDEV",
-  "displayName": "TO-DO Changelog Manager",
-  "description": "Manage your TO-DO tasks and changelogs efficiently.",
+  "displayName": "TO-DO Manager",
+  "description": "Manage your TO-DO tasks efficiently.",
   "version": "0.0.10",
   "engines": {
     "vscode": "^1.108.0"
