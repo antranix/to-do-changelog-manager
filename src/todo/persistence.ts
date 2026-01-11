@@ -40,6 +40,9 @@ export async function writeTodos(items: TodoItem[]): Promise<void> {
 
   const md = generateMarkdown(items);
   await vscode.workspace.fs.writeFile(uri, Buffer.from(md, "utf8"));
+
+  // 🧾 Agregar al .gitignore
+  await ensureGitignoreHasEntry(FILE_NAME);
 }
 
 /* ---------------- HELPERS ---------------- */
@@ -116,6 +119,39 @@ function generateMarkdown(items: TodoItem[]): string {
 
   lines.push("");
   return lines.join("\n");
+}
+
+async function ensureGitignoreHasEntry(fileName: string) {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders || folders.length === 0) {
+    return;
+  }
+
+  const rootUri = folders[0].uri;
+  const gitignoreUri = vscode.Uri.joinPath(rootUri, ".gitignore");
+
+  // 📌 Declárala aquí
+  let content = "";
+
+  try {
+    const bytes = await vscode.workspace.fs.readFile(gitignoreUri);
+    content = Buffer.from(bytes).toString("utf8");
+  } catch {
+    // Si no existe .gitignore, content queda como ""
+  }
+
+  // Ya sí se puede usar
+  if (content.split(/\r?\n/).includes(fileName)) {
+    return;
+  }
+
+  const newContent =
+    content + (content.length > 0 ? "\n" : "") + fileName + "\n";
+
+  await vscode.workspace.fs.writeFile(
+    gitignoreUri,
+    Buffer.from(newContent, "utf8")
+  );
 }
 
 /* ---------------- FACTORY ---------------- */

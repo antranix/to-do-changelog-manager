@@ -66,7 +66,7 @@ No command-only workflow — everything is visual and intuitive.
 
 1. Open **VS Code**
 2. Go to **Extensions** (`Ctrl+Shift+X` / `Cmd+Shift+X`)
-3. Search for **To-Do Changelog Manager**
+3. Search for **To-Do Changelog Manager** [To-Do Changelog Manager](https://marketplace.visualstudio.com/items?itemName=AntranixDEV.to-do-changelog-manager)
 4. Click **Install**
 
 ---
