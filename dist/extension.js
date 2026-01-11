@@ -43,20 +43,32 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.registerTodo = registerTodo;
 const vscode = __importStar(__webpack_require__(2));
 const provider_1 = __webpack_require__(3);
+// Funciones de persistencia
+const persistence_1 = __webpack_require__(4);
+// Escáner de TODOs en archivos
+const scanner_1 = __webpack_require__(30);
 function registerTodo(context) {
     const provider = new provider_1.TodoProvider();
     vscode.window.registerTreeDataProvider("todoView", provider);
-    context.subscriptions.push(vscode.commands.registerCommand("todo.add", async () => {
+    context.subscriptions.push(
+    // Agregar tarea manual
+    vscode.commands.registerCommand("todo.add", async () => {
         const text = await vscode.window.showInputBox({
             prompt: "Add a new task",
         });
         if (text) {
             await provider.add(text.trim());
         }
-    }), vscode.commands.registerCommand("todo.complete", (item) => item && provider.complete(item)), vscode.commands.registerCommand("todo.uncomplete", (item) => item && provider.uncomplete(item)), vscode.commands.registerCommand("todo.refresh", () => {
+    }), 
+    // Marcar como completada
+    vscode.commands.registerCommand("todo.complete", (item) => item && provider.complete(item)), 
+    // Marcar como incompleta
+    vscode.commands.registerCommand("todo.uncomplete", (item) => item && provider.uncomplete(item)), 
+    // Refrescar lista
+    vscode.commands.registerCommand("todo.refresh", () => {
         provider.refresh();
     }), 
-    // ✅ ESTE ES EL QUE FALTABA
+    // Editar texto de tarea
     vscode.commands.registerCommand("todo.edit", async (item) => {
         if (!item)
             return;
@@ -68,11 +80,35 @@ function registerTodo(context) {
             await provider.edit(item, text.trim());
         }
     }), 
-    // (recomendado agregar también)
+    // Eliminar tarea
     vscode.commands.registerCommand("todo.remove", async (item) => {
         if (!item)
             return;
         await provider.remove(item);
+    }), 
+    // ✨ Nuevo: Escanear TODOs dentro de archivos del proyecto
+    vscode.commands.registerCommand("todo.scanFiles", async () => {
+        try {
+            // Busca TODOs en todos los archivos
+            const found = await (0, scanner_1.scanTodosInWorkspace)();
+            if (found.length === 0) {
+                vscode.window.showInformationMessage("No TODOs found in project files.");
+                return;
+            }
+            // Leer tareas existentes
+            const existing = await (0, persistence_1.readTodos)();
+            // Concatenar (puedes luego hacer deduplicación si quieres)
+            const combined = [...existing, ...found];
+            // Guardar todo en persistencia
+            await (0, persistence_1.writeTodos)(combined);
+            // Refrescar lista
+            provider.refresh();
+            vscode.window.showInformationMessage(`Added ${found.length} TODOs found in project files.`);
+        }
+        catch (err) {
+            console.error("Error scanning TODOs:", err);
+            vscode.window.showErrorMessage("Failed to scan TODOs in project files.");
+        }
     }));
 }
 
@@ -132,6 +168,7 @@ class TodoProvider {
     constructor() {
         void this.load();
     }
+    // Carga y ordena tareas
     async load() {
         const all = await (0, persistence_1.readTodos)();
         const pending = all
@@ -143,30 +180,57 @@ class TodoProvider {
         this.items = [...pending, ...done];
         this._onDidChange.fire();
     }
+    // Fuerza recarga
     refresh() {
         void this.load();
     }
+    // Representación visual de cada TODO
     getTreeItem(item) {
         const added = formatDate(item.date_added);
         const finished = item.completed && item.date_finished
-            ? ` (finished: ${formatDate(item.date_finished)})`
+            ? `(finished: ${formatDate(item.date_finished)})`
             : "";
-        const label = `${added} – ${item.text}${finished}`;
-        const treeItem = new vscode.TreeItem(label);
+        const mainLabel = `${added} – ${item.text}${finished}`;
+        const treeItem = new vscode.TreeItem(mainLabel);
+        let absolutePathStr;
+        if (item.relativePath && typeof item.line === "number") {
+            const rootFolders = vscode.workspace.workspaceFolders;
+            if (rootFolders && rootFolders.length > 0) {
+                const absoluteUri = vscode.Uri.joinPath(rootFolders[0].uri, item.relativePath);
+                absolutePathStr = absoluteUri.fsPath;
+                treeItem.description = `${item.relativePath}:${item.line + 1}`;
+                // 🛠 Tooltip mejorado con ruta absoluta
+                treeItem.tooltip = `${item.text}\n${absolutePathStr}:${item.line + 1}`;
+                treeItem.command = {
+                    command: "vscode.open",
+                    title: "Open File",
+                    arguments: [
+                        absoluteUri,
+                        { selection: new vscode.Range(item.line, 0, item.line, 0) },
+                    ],
+                };
+            }
+        }
+        // 📝 Si no hay ruta/linea, tooltip normal
+        if (!treeItem.tooltip) {
+            treeItem.tooltip = mainLabel;
+        }
         treeItem.contextValue = item.completed ? "done" : "pending";
-        treeItem.tooltip = label;
         treeItem.iconPath = new vscode.ThemeIcon(item.completed ? "check" : "circle-outline");
         return treeItem;
     }
+    // Retorna las tareas para el TreeView
     getChildren(element) {
         return Promise.resolve(element ? [] : this.items);
     }
+    // Agregar tarea manual
     async add(text) {
         const todos = await (0, persistence_1.readTodos)();
         todos.push((0, persistence_1.makeTodo)(text));
         await (0, persistence_1.writeTodos)(todos);
         this.refresh();
     }
+    // Marcar como completada
     async complete(item) {
         if (!item)
             return;
@@ -179,6 +243,7 @@ class TodoProvider {
         await (0, persistence_1.writeTodos)(todos);
         this.refresh();
     }
+    // Marcar como incompleta
     async uncomplete(item) {
         if (!item)
             return;
@@ -191,6 +256,7 @@ class TodoProvider {
         await (0, persistence_1.writeTodos)(todos);
         this.refresh();
     }
+    // Editar texto de tarea
     async edit(item, newText) {
         const todos = await (0, persistence_1.readTodos)();
         const todo = todos.find((t) => t.id === item.id);
@@ -200,10 +266,25 @@ class TodoProvider {
         await (0, persistence_1.writeTodos)(todos);
         this.refresh();
     }
+    // Eliminar tarea
     async remove(item) {
         const todos = await (0, persistence_1.readTodos)();
         const filtered = todos.filter((t) => t.id !== item.id);
         await (0, persistence_1.writeTodos)(filtered);
+        this.refresh();
+    }
+    // ✨ NUEVO método para agregar TODOs escaneados desde archivos
+    async addScanned(found) {
+        if (found.length === 0)
+            return;
+        const todos = await (0, persistence_1.readTodos)();
+        // Evita duplicados simples: si el texto coincide exacto
+        const existingTexts = new Set(todos.map((t) => t.text));
+        const uniques = found.filter((t) => !existingTexts.has(t.text));
+        if (uniques.length === 0)
+            return;
+        const combined = [...todos, ...uniques];
+        await (0, persistence_1.writeTodos)(combined);
         this.refresh();
     }
 }
@@ -309,8 +390,11 @@ function parseMarkdown(md) {
         let id = uuidv4();
         let date_added = new Date().toISOString();
         let date_finished = null;
+        // ✨ Campos extras
+        let relativePath;
+        let lineNumber;
         if (metaRaw) {
-            // ✅ New format: JSON metadata
+            // JSON metadata
             if (metaRaw.startsWith("{") && metaRaw.endsWith("}")) {
                 try {
                     const meta = JSON.parse(metaRaw);
@@ -320,14 +404,20 @@ function parseMarkdown(md) {
                         date_added = meta.date_added;
                     if (meta.date_finished !== undefined)
                         date_finished = meta.date_finished ?? null;
+                    // ✨ Cargar ruta relativa y línea si están
+                    if (typeof meta.relativePath === "string") {
+                        relativePath = meta.relativePath;
+                    }
+                    if (typeof meta.line === "number") {
+                        lineNumber = meta.line;
+                    }
                 }
                 catch {
-                    // ignore bad meta
+                    // ignore invalid JSON
                 }
             }
             else {
-                // ⚠️ Backward compatibility (old "key:value key:value")
-                // Parse as: key:(anything up to next " key:" or end)
+                // backward compatibility
                 const meta = {};
                 const re = /(\w+):([\s\S]*?)(?=\s+\w+:|$)/g;
                 let m;
@@ -340,6 +430,7 @@ function parseMarkdown(md) {
                     date_added = meta.date_added;
                 if (meta.date_finished)
                     date_finished = meta.date_finished;
+                // No legacy support here for relativePath/line
             }
         }
         todos.push({
@@ -348,6 +439,8 @@ function parseMarkdown(md) {
             completed,
             date_added,
             date_finished,
+            relativePath,
+            line: lineNumber,
         });
     }
     return todos;
@@ -356,11 +449,17 @@ function generateMarkdown(items) {
     const lines = ["# TO-DO", ""];
     for (const item of items) {
         const checkbox = item.completed ? "x" : " ";
-        const metaJson = JSON.stringify({
+        // Incluye relativePath y line en la metadata si existen
+        const meta = {
             id: item.id,
             date_added: item.date_added,
             date_finished: item.date_finished ?? null,
-        });
+        };
+        if (item.relativePath)
+            meta.relativePath = item.relativePath;
+        if (typeof item.line === "number")
+            meta.line = item.line;
+        const metaJson = JSON.stringify(meta);
         lines.push(`- [${checkbox}] ${item.text} <!-- ${metaJson} -->`);
     }
     lines.push("");
@@ -1546,6 +1645,88 @@ function generateMd(versions) {
     return lines.join("\n");
 }
 
+
+/***/ }),
+/* 30 */
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.scanTodosInWorkspace = scanTodosInWorkspace;
+const vscode = __importStar(__webpack_require__(2));
+const path = __importStar(__webpack_require__(31));
+const persistence_1 = __webpack_require__(4);
+const TODO_REGEX = /(\/\/\s*TO-?DO)/i;
+async function scanTodosInWorkspace() {
+    const todos = [];
+    const files = await vscode.workspace.findFiles("**/*.{js,ts,jsx,tsx,py,java,go,cpp,c,h}", "**/node_modules/**");
+    for (const file of files) {
+        const document = await vscode.workspace.openTextDocument(file);
+        // Determina la carpeta raíz que contiene este archivo
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(file);
+        const rootPath = workspaceFolder?.uri.fsPath;
+        for (let i = 0; i < document.lineCount; i++) {
+            const lineText = document.lineAt(i).text;
+            if (TODO_REGEX.test(lineText)) {
+                // Extrae solo la parte después de TODO / TO-DO
+                const match = lineText.match(/(?:TODO:?|TO-DO:?)(.*)/i);
+                const rawText = match ? match[1].trim() : lineText.trim();
+                // Calcula ruta relativa si hay carpeta workspace abierta
+                const relativePath = rootPath
+                    ? path.relative(rootPath, file.fsPath)
+                    : file.fsPath;
+                const taskText = `${rawText} (${relativePath}:${i + 1})`;
+                const todo = (0, persistence_1.makeTodo)(taskText);
+                // Guarda info extra para navegación
+                todo.fileUri = file;
+                todo.line = i;
+                todo.relativePath = relativePath;
+                todos.push(todo);
+            }
+        }
+    }
+    return todos;
+}
+
+
+/***/ }),
+/* 31 */
+/***/ ((module) => {
+
+module.exports = require("path");
 
 /***/ })
 /******/ 	]);

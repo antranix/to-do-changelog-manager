@@ -64,21 +64,33 @@ function parseMarkdown(md: string): TodoItem[] {
     let date_added = new Date().toISOString();
     let date_finished: string | null = null;
 
+    // ✨ Campos extras
+    let relativePath: string | undefined;
+    let lineNumber: number | undefined;
+
     if (metaRaw) {
-      // ✅ New format: JSON metadata
+      // JSON metadata
       if (metaRaw.startsWith("{") && metaRaw.endsWith("}")) {
         try {
-          const meta = JSON.parse(metaRaw) as Partial<TodoItem>;
+          const meta = JSON.parse(metaRaw) as any;
+
           if (meta.id) id = meta.id;
           if (meta.date_added) date_added = meta.date_added;
           if (meta.date_finished !== undefined)
             date_finished = meta.date_finished ?? null;
+
+          // ✨ Cargar ruta relativa y línea si están
+          if (typeof meta.relativePath === "string") {
+            relativePath = meta.relativePath;
+          }
+          if (typeof meta.line === "number") {
+            lineNumber = meta.line;
+          }
         } catch {
-          // ignore bad meta
+          // ignore invalid JSON
         }
       } else {
-        // ⚠️ Backward compatibility (old "key:value key:value")
-        // Parse as: key:(anything up to next " key:" or end)
+        // backward compatibility
         const meta: Record<string, string> = {};
         const re = /(\w+):([\s\S]*?)(?=\s+\w+:|$)/g;
         let m: RegExpExecArray | null;
@@ -88,6 +100,8 @@ function parseMarkdown(md: string): TodoItem[] {
         if (meta.id) id = meta.id;
         if (meta.date_added) date_added = meta.date_added;
         if (meta.date_finished) date_finished = meta.date_finished;
+
+        // No legacy support here for relativePath/line
       }
     }
 
@@ -97,6 +111,8 @@ function parseMarkdown(md: string): TodoItem[] {
       completed,
       date_added,
       date_finished,
+      relativePath,
+      line: lineNumber,
     });
   }
 
@@ -108,11 +124,18 @@ function generateMarkdown(items: TodoItem[]): string {
 
   for (const item of items) {
     const checkbox = item.completed ? "x" : " ";
-    const metaJson = JSON.stringify({
+
+    // Incluye relativePath y line en la metadata si existen
+    const meta: any = {
       id: item.id,
       date_added: item.date_added,
       date_finished: item.date_finished ?? null,
-    });
+    };
+
+    if (item.relativePath) meta.relativePath = item.relativePath;
+    if (typeof item.line === "number") meta.line = item.line;
+
+    const metaJson = JSON.stringify(meta);
 
     lines.push(`- [${checkbox}] ${item.text} <!-- ${metaJson} -->`);
   }

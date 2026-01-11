@@ -26,6 +26,7 @@
     "onCommand:todo.refresh",
     "onCommand:todo.edit",
     "onCommand:todo.remove",
+    "onCommand:todo.scanFiles",
     "onCommand:changelog.refresh",
     "onCommand:changelog.addVersion",
     "onCommand:changelog.addEntry",
@@ -49,7 +50,7 @@
       },
       {
         "command": "todo.refresh",
-        "title": "↻"
+        "title": "🔄"
       },
       {
         "command": "todo.edit",
@@ -60,8 +61,12 @@
         "title": "✖️"
       },
       {
+        "command": "todo.scanFiles",
+        "title": "👁️"
+      },
+      {
         "command": "changelog.refresh",
-        "title": "↻"
+        "title": "🔄"
       },
       {
         "command": "changelog.addVersion",
@@ -121,6 +126,11 @@
         },
         {
           "command": "todo.refresh",
+          "when": "view == todoView",
+          "group": "navigation"
+        },
+        {
+          "command": "todo.scanFiles",
           "when": "view == todoView",
           "group": "navigation"
         },

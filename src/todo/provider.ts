@@ -12,6 +12,7 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
     void this.load();
   }
 
+  // Carga y ordena tareas
   async load() {
     const all = await readTodos();
 
@@ -29,22 +30,55 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
     this._onDidChange.fire();
   }
 
+  // Fuerza recarga
   refresh(): void {
     void this.load();
   }
 
+  // Representación visual de cada TODO
   getTreeItem(item: TodoItem): vscode.TreeItem {
     const added = formatDate(item.date_added);
     const finished =
       item.completed && item.date_finished
-        ? ` (finished: ${formatDate(item.date_finished)})`
+        ? `(finished: ${formatDate(item.date_finished)})`
         : "";
+    const mainLabel = `${added} – ${item.text}${finished}`;
 
-    const label = `${added} – ${item.text}${finished}`;
+    const treeItem = new vscode.TreeItem(mainLabel);
 
-    const treeItem = new vscode.TreeItem(label);
+    let absolutePathStr: string | undefined;
+
+    if (item.relativePath && typeof item.line === "number") {
+      const rootFolders = vscode.workspace.workspaceFolders;
+      if (rootFolders && rootFolders.length > 0) {
+        const absoluteUri = vscode.Uri.joinPath(
+          rootFolders[0].uri,
+          item.relativePath
+        );
+        absolutePathStr = absoluteUri.fsPath;
+
+        treeItem.description = `${item.relativePath}:${item.line + 1}`;
+
+        // 🛠 Tooltip mejorado con ruta absoluta
+        treeItem.tooltip = `${item.text}\n${absolutePathStr}:${item.line + 1}`;
+
+        treeItem.command = {
+          command: "vscode.open",
+          title: "Open File",
+          arguments: [
+            absoluteUri,
+            { selection: new vscode.Range(item.line, 0, item.line, 0) },
+          ],
+        };
+      }
+    }
+
+    // 📝 Si no hay ruta/linea, tooltip normal
+    if (!treeItem.tooltip) {
+      treeItem.tooltip = mainLabel;
+    }
+
     treeItem.contextValue = item.completed ? "done" : "pending";
-    treeItem.tooltip = label;
     treeItem.iconPath = new vscode.ThemeIcon(
       item.completed ? "check" : "circle-outline"
     );
@@ -52,10 +86,12 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
     return treeItem;
   }
 
+  // Retorna las tareas para el TreeView
   getChildren(element?: TodoItem): Thenable<TodoItem[]> {
     return Promise.resolve(element ? [] : this.items);
   }
 
+  // Agregar tarea manual
   async add(text: string): Promise<void> {
     const todos = await readTodos();
     todos.push(makeTodo(text));
@@ -63,6 +99,7 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
     this.refresh();
   }
 
+  // Marcar como completada
   async complete(item?: TodoItem): Promise<void> {
     if (!item) return;
 
@@ -76,6 +113,7 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
     this.refresh();
   }
 
+  // Marcar como incompleta
   async uncomplete(item?: TodoItem): Promise<void> {
     if (!item) return;
 
@@ -88,6 +126,8 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
     await writeTodos(todos);
     this.refresh();
   }
+
+  // Editar texto de tarea
   async edit(item: TodoItem, newText: string) {
     const todos = await readTodos();
     const todo = todos.find((t) => t.id === item.id);
@@ -98,10 +138,29 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
     this.refresh();
   }
 
+  // Eliminar tarea
   async remove(item: TodoItem) {
     const todos = await readTodos();
     const filtered = todos.filter((t) => t.id !== item.id);
     await writeTodos(filtered);
+    this.refresh();
+  }
+
+  // ✨ NUEVO método para agregar TODOs escaneados desde archivos
+  async addScanned(found: TodoItem[]) {
+    if (found.length === 0) return;
+
+    const todos = await readTodos();
+
+    // Evita duplicados simples: si el texto coincide exacto
+    const existingTexts = new Set(todos.map((t) => t.text));
+    const uniques = found.filter((t) => !existingTexts.has(t.text));
+
+    if (uniques.length === 0) return;
+
+    const combined = [...todos, ...uniques];
+    await writeTodos(combined);
+
     this.refresh();
   }
 }
