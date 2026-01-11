@@ -5,7 +5,9 @@ export interface TodoItem {
   date_added: string;
   date_finished: string | null;
 
-  // Campos nuevos
   relativePath?: string;
   line?: number;
+
+  // 👇 IDENTIDAD PERSISTENTE
+  sourceKey?: string;
 }

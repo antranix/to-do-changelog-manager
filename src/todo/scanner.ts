@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import type { TodoItem } from "./types";
-import { makeTodo } from "./persistence";
+import { makeScannedTodo } from "./persistence";
 
 const TODO_REGEX = /(\/\/\s*TO-?DO)/i;
 
 export async function scanTodosInWorkspace(): Promise<TodoItem[]> {
   const todos: TodoItem[] = [];
+  const seen = new Set<string>();
 
   const files = await vscode.workspace.findFiles(
     "**/*.{js,ts,jsx,tsx,py,java,go,cpp,c,h}",
@@ -14,36 +15,25 @@ export async function scanTodosInWorkspace(): Promise<TodoItem[]> {
   );
 
   for (const file of files) {
-    const document = await vscode.workspace.openTextDocument(file);
+    const doc = await vscode.workspace.openTextDocument(file);
+    const ws = vscode.workspace.getWorkspaceFolder(file);
+    const root = ws?.uri.fsPath;
 
-    // Determina la carpeta raíz que contiene este archivo
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(file);
-    const rootPath = workspaceFolder?.uri.fsPath;
+    for (let i = 0; i < doc.lineCount; i++) {
+      const text = doc.lineAt(i).text;
+      if (!TODO_REGEX.test(text)) continue;
 
-    for (let i = 0; i < document.lineCount; i++) {
-      const lineText = document.lineAt(i).text;
+      const match = text.match(/(?:TODO:?|TO-DO:?)(.*)/i);
+      const raw = match ? match[1].trim() : "";
 
-      if (TODO_REGEX.test(lineText)) {
-        // Extrae solo la parte después de TODO / TO-DO
-        const match = lineText.match(/(?:TODO:?|TO-DO:?)(.*)/i);
-        const rawText = match ? match[1].trim() : lineText.trim();
+      const rel = root ? path.relative(root, file.fsPath) : file.fsPath;
 
-        // Calcula ruta relativa si hay carpeta workspace abierta
-        const relativePath = rootPath
-          ? path.relative(rootPath, file.fsPath)
-          : file.fsPath;
+      const todo = makeScannedTodo(raw, rel, i);
 
-        const taskText = `${rawText} (${relativePath}:${i + 1})`;
+      if (seen.has(todo.id)) continue;
+      seen.add(todo.id);
 
-        const todo = makeTodo(taskText);
-
-        // Guarda info extra para navegación
-        (todo as any).fileUri = file;
-        (todo as any).line = i;
-        (todo as any).relativePath = relativePath;
-
-        todos.push(todo);
-      }
+      todos.push(todo);
     }
   }
 

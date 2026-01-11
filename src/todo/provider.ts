@@ -12,103 +12,75 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
     void this.load();
   }
 
-  // Carga y ordena tareas
   async load() {
     const all = await readTodos();
 
-    const pending = all
-      .filter((i) => !i.completed)
-      .sort((a, b) => b.date_added.localeCompare(a.date_added));
+    this.items = [
+      ...all.filter((t) => !t.completed),
+      ...all.filter((t) => t.completed),
+    ];
 
-    const done = all
-      .filter((i) => i.completed)
-      .sort((a, b) =>
-        (b.date_finished ?? "").localeCompare(a.date_finished ?? "")
-      );
-
-    this.items = [...pending, ...done];
     this._onDidChange.fire();
   }
 
-  // Fuerza recarga
-  refresh(): void {
+  refresh() {
     void this.load();
   }
 
-  // Representación visual de cada TODO
   getTreeItem(item: TodoItem): vscode.TreeItem {
-    const added = formatDate(item.date_added);
-    const finished =
-      item.completed && item.date_finished
-        ? `(finished: ${formatDate(item.date_finished)})`
-        : "";
-    const mainLabel = `${added} – ${item.text}${finished}`;
-
-    const treeItem = new vscode.TreeItem(mainLabel);
-
-    let absolutePathStr: string | undefined;
+    const label = `${item.text}`;
+    const treeItem = new vscode.TreeItem(label);
 
     if (item.relativePath && typeof item.line === "number") {
-      const rootFolders = vscode.workspace.workspaceFolders;
-      if (rootFolders && rootFolders.length > 0) {
-        const absoluteUri = vscode.Uri.joinPath(
-          rootFolders[0].uri,
-          item.relativePath
-        );
-        absolutePathStr = absoluteUri.fsPath;
-
-        treeItem.description = `${item.relativePath}:${item.line + 1}`;
-
-        // 🛠 Tooltip mejorado con ruta absoluta
-        treeItem.tooltip = `${item.text}\n${absolutePathStr}:${item.line + 1}`;
-
+      const root = vscode.workspace.workspaceFolders?.[0];
+      if (root) {
+        const uri = vscode.Uri.joinPath(root.uri, item.relativePath);
         treeItem.command = {
           command: "vscode.open",
-          title: "Open File",
+          title: "Open",
           arguments: [
-            absoluteUri,
+            uri,
             { selection: new vscode.Range(item.line, 0, item.line, 0) },
           ],
         };
+        treeItem.description = `${item.relativePath}:${item.line + 1}`;
       }
     }
 
-    // 📝 Si no hay ruta/linea, tooltip normal
-    if (!treeItem.tooltip) {
-      treeItem.tooltip = mainLabel;
-    }
-
     treeItem.contextValue = item.completed ? "done" : "pending";
-    treeItem.iconPath = new vscode.ThemeIcon(
-      item.completed ? "check" : "circle-outline"
-    );
-
     return treeItem;
   }
 
-  // Retorna las tareas para el TreeView
-  getChildren(element?: TodoItem): Thenable<TodoItem[]> {
-    return Promise.resolve(element ? [] : this.items);
+  getChildren(): Thenable<TodoItem[]> {
+    return Promise.resolve(this.items);
   }
 
-  // Agregar tarea manual
-  async add(text: string): Promise<void> {
+  async add(text: string) {
     const todos = await readTodos();
     todos.push(makeTodo(text));
     await writeTodos(todos);
     this.refresh();
   }
 
-  // Marcar como completada
-  async complete(item?: TodoItem): Promise<void> {
-    if (!item) return;
+  async addScanned(found: TodoItem[]) {
+    if (found.length === 0) return;
 
+    const existing = await readTodos();
+    const map = new Map<string, TodoItem>();
+
+    for (const t of existing) map.set(t.id, t);
+    for (const t of found) if (!map.has(t.id)) map.set(t.id, t);
+
+    await writeTodos([...map.values()]);
+    this.refresh();
+  }
+
+  async edit(item: TodoItem, newText: string): Promise<void> {
     const todos = await readTodos();
     const todo = todos.find((t) => t.id === item.id);
     if (!todo) return;
 
-    todo.completed = true;
-    todo.date_finished = new Date().toISOString();
+    todo.text = newText;
     await writeTodos(todos);
     this.refresh();
   }
@@ -123,55 +95,24 @@ export class TodoProvider implements vscode.TreeDataProvider<TodoItem> {
 
     todo.completed = false;
     todo.date_finished = null;
+
     await writeTodos(todos);
     this.refresh();
   }
 
-  // Editar texto de tarea
-  async edit(item: TodoItem, newText: string) {
+  async complete(item: TodoItem) {
     const todos = await readTodos();
-    const todo = todos.find((t) => t.id === item.id);
-    if (!todo) return;
+    const t = todos.find((x) => x.id === item.id);
+    if (!t) return;
 
-    todo.text = newText;
+    t.completed = true;
+    t.date_finished = new Date().toISOString();
     await writeTodos(todos);
     this.refresh();
   }
 
-  // Eliminar tarea
   async remove(item: TodoItem) {
-    const todos = await readTodos();
-    const filtered = todos.filter((t) => t.id !== item.id);
-    await writeTodos(filtered);
+    await writeTodos((await readTodos()).filter((t) => t.id !== item.id));
     this.refresh();
   }
-
-  // ✨ NUEVO método para agregar TODOs escaneados desde archivos
-  async addScanned(found: TodoItem[]) {
-    if (found.length === 0) return;
-
-    const todos = await readTodos();
-
-    // Evita duplicados simples: si el texto coincide exacto
-    const existingTexts = new Set(todos.map((t) => t.text));
-    const uniques = found.filter((t) => !existingTexts.has(t.text));
-
-    if (uniques.length === 0) return;
-
-    const combined = [...todos, ...uniques];
-    await writeTodos(combined);
-
-    this.refresh();
-  }
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(
-    2,
-    "0"
-  )}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
