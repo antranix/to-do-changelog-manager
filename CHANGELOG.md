@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.0.16] - 2026-01-11
+### Fixed
+- Bug fixes.
+
 ## [0.0.15] - 2026-01-11
 ### Added
 - Improved task refresh to resync file links and completion status.

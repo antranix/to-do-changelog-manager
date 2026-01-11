@@ -74,7 +74,7 @@ No command-only workflow — everything is visual and intuitive.
 
 ### To-Do Manager View
 
-![To-Do Manager View](https://github.com/antranix/to-do-changelog-manager/blob/main/screen/1.png)
+![To-Do Manager View](./screen/1.png)
 
 Manage your development tasks using an intuitive tree view with quick actions to add, edit, delete, and mark items as completed.
 
@@ -82,7 +82,7 @@ Manage your development tasks using an intuitive tree view with quick actions to
 
 ### Changelog Manager View
 
-![Changelog Manager View](https://github.com/antranix/to-do-changelog-manager/blob/main/screen/2.png)
+![Changelog Manager View](./screen/2.png)
 
 Create and maintain structured changelogs visually, keeping versions ordered and sections clean.
 
