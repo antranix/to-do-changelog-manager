@@ -56,7 +56,6 @@ Each view includes:
 
 * Toolbar buttons
 * Context menu actions
-* Real-time updates
 
 No command-only workflow — everything is visual and intuitive.
 
@@ -91,15 +90,46 @@ Create and maintain structured changelogs visually, keeping versions ordered and
 
 ## 🛠️ Usage
 
-### To-Do Manager
+### 📝 Task Management
+- ➕ Add new tasks manually.
+- ✏️ Edit existing tasks.
+- ❌ Delete tasks you no longer need.
+- ✅ Mark tasks as completed or uncompleted at any time.
+- 🔄 Refresh tasks to update file links and task status.
+- 👁️ Scan the entire workspace to automatically find TODO comments.
 
-* Open the **To-Do Manager** view
-* Use the toolbar buttons to:
+#### 🔍 Automatic TODO Detection
+The extension scans your workspace and automatically detects TODO comments written in any of the following formats:
 
-  * Add tasks
-  * Edit tasks
-  * Delete tasks
-  * Mark tasks as completed
+- `//TODO`
+- `// TODO`
+- `//TO-DO`
+- `// TO-DO`
+
+Detected TODOs are automatically converted into tasks.
+
+#### 📎 File & Line Linking
+- If a task comes from a source file, it is linked to:
+  - The **file**
+  - The **exact line number**
+- Clicking the task opens the file directly at the corresponding line.
+
+#### ✔️ Completing a TODO
+When you mark a file-based TODO as completed:
+- The TODO line is **removed from the source file**
+- The task **remains stored** in the task list as completed (history is preserved)
+
+#### ♻️ Restore a Completed TODO
+- You can mark a completed task as **not completed**
+- The TODO comment is **reinserted into the original file**
+- The task returns to the active task list
+
+#### 📂 Persistence
+- Tasks are stored locally inside your workspace
+- Completed tasks remain available as history
+- A `to-do.md` file is automatically created in the project root
+- By default, `to-do.md` is added to `.gitignore` to keep tasks local
+- To enable Git synchronization, remove `to-do.md` from `.gitignore`
 
 ### Changelog Manager
 
