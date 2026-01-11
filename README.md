@@ -121,14 +121,3 @@ All actions are available via toolbar buttons or right-click menus.
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
-
----
-
-Si quieres, el siguiente paso lógico sería:
-
-* 🔍 Optimizar keywords para el **Marketplace search**
-* 🎞️ Agregar un **GIF animado**
-* 🧩 Añadir una sección **“Why use this extension?”**
-* 🧪 Alinear README con tu `package.json` (comandos, vistas, contributes)
-
-Dime y lo dejamos **nivel extensión top** 🚀
