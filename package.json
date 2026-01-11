@@ -1,8 +1,8 @@
 {
-  "name": "to-do-changelog-manager",
+  "name": "to-do-manager",
   "publisher": "AntranixDEV",
-  "displayName": "TO-DO Changelog Manager",
-  "description": "Manage your TO-DO tasks and changelogs efficiently.",
+  "displayName": "TO-DO Manager",
+  "description": "Manage your TO-DO tasks efficiently.",
   "version": "0.0.10",
   "engines": {
     "vscode": "^1.108.0"
@@ -11,7 +11,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/antranix/to-do-changelog-manager"
+    "url": "https://github.com/antranix/to-do-manager"
   },
   "categories": [
     "Other"
@@ -19,19 +19,12 @@
   "main": "./dist/extension.js",
   "activationEvents": [
     "onView:todoView",
-    "onView:changelogView",
     "onCommand:todo.add",
     "onCommand:todo.complete",
     "onCommand:todo.uncomplete",
     "onCommand:todo.refresh",
     "onCommand:todo.edit",
-    "onCommand:todo.remove",
-    "onCommand:changelog.refresh",
-    "onCommand:changelog.addVersion",
-    "onCommand:changelog.addEntry",
-    "onCommand:changelog.editEntry",
-    "onCommand:changelog.removeEntry",
-    "onCommand:changelog.removeVersion"
+    "onCommand:todo.remove"
   ],
   "contributes": {
     "commands": [
@@ -58,30 +51,6 @@
       {
         "command": "todo.remove",
         "title": "✖️"
-      },
-      {
-        "command": "changelog.refresh",
-        "title": "↻"
-      },
-      {
-        "command": "changelog.addVersion",
-        "title": "➕"
-      },
-      {
-        "command": "changelog.addEntry",
-        "title": "➕"
-      },
-      {
-        "command": "changelog.editEntry",
-        "title": "✏️"
-      },
-      {
-        "command": "changelog.removeEntry",
-        "title": "✖️"
-      },
-      {
-        "command": "changelog.removeVersion",
-        "title": "✖️"
       }
     ],
     "viewsContainers": {
@@ -90,11 +59,6 @@
           "id": "todoContainer",
           "title": "TO-DO",
           "icon": "dist/resources/img/todo-list.svg"
-        },
-        {
-          "id": "changelogContainer",
-          "title": "CHANGELOG",
-          "icon": "dist/resources/img/changelog.svg"
         }
       ]
     },
@@ -103,12 +67,6 @@
         {
           "id": "todoView",
           "name": "TO-DO"
-        }
-      ],
-      "changelogContainer": [
-        {
-          "id": "changelogView",
-          "name": "CHANGELOG"
         }
       ]
     },
@@ -122,16 +80,6 @@
         {
           "command": "todo.refresh",
           "when": "view == todoView",
-          "group": "navigation"
-        },
-        {
-          "command": "changelog.addVersion",
-          "when": "view == changelogView",
-          "group": "navigation"
-        },
-        {
-          "command": "changelog.refresh",
-          "when": "view == changelogView",
           "group": "navigation"
         }
       ],
@@ -149,31 +97,6 @@
         {
           "command": "todo.edit",
           "when": "view == todoView && (viewItem == pending || viewItem == done)",
-          "group": "inline"
-        },
-        {
-          "command": "todo.remove",
-          "when": "view == todoView && (viewItem == pending || viewItem == done)",
-          "group": "inline"
-        },
-        {
-          "command": "changelog.addEntry",
-          "when": "view == changelogView && viewItem == changelogSection",
-          "group": "inline"
-        },
-        {
-          "command": "changelog.editEntry",
-          "when": "view == changelogView && viewItem == changelogEntry",
-          "group": "inline"
-        },
-        {
-          "command": "changelog.removeEntry",
-          "when": "view == changelogView && viewItem == changelogEntry",
-          "group": "inline"
-        },
-        {
-          "command": "changelog.removeVersion",
-          "when": "view == changelogView && viewItem == changelogVersion",
           "group": "inline"
         }
       ]
